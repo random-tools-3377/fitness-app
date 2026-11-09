@@ -144,7 +144,10 @@ class Repository(private val context: Context, val db: AppDatabase) {
         val planned = dao.plannedBetween(from.toDay(), to.toDay()).map { it.toCore() }
         val recipes = dao.allRecipes().associate { it.id to it.toCore() }
         builtInFoods()
-        val list = Plan.shopping(planned, recipes) { e -> runCatching { foodOf(e)?.let { f -> e.amount.baseAmount(f) } }.getOrNull() ?: e.amount.takeIf { it.portion == null }?.quantity }
+        val foods = planned.associateWith { e -> runCatching { foodOf(e) }.getOrNull() }
+        val list = Plan.shopping(planned, recipes) { e ->
+            runCatching { foods[e]?.let { f -> e.amount.baseAmount(f) } }.getOrNull() ?: e.amount.takeIf { it.portion == null }?.quantity
+        }
         db.withTransaction {
             dao.clearMadeAndTicked()
             dao.insertShopping(list.map { it.toRow() })
