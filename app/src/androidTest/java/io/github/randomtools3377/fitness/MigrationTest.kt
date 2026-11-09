@@ -19,11 +19,14 @@ import org.junit.runner.RunWith
 class MigrationTest {
     private val name = "migration-test.db"
 
+    /** The current database version; raise it with each new one. */
+    private val LATEST = 4
+
     @get:Rule
     val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), AppDatabase::class.java)
 
     @Test
-    fun aVersion1DatabaseKeepsItsDiaryAndGainsWorkouts() {
+    fun aVersion1DatabaseKeepsItsDiaryAndMovesToTheLatestLayout() {
         helper.createDatabase(name, 1).apply {
             execSQL("INSERT INTO foods (id, name, brand, unit, kcal, protein, carbs, fat, portions, createdAt, hidden) VALUES (1, 'Oats', '', 'GRAM', 380, 13, 60, 7, '[]', 0, 0)")
             execSQL("INSERT INTO entries (id, day, meal, foodId, builtInId, name, quantity, portion, unit, kcal, protein, carbs, fat, createdAt) VALUES (1, 20401, 'BREAKFAST', 1, NULL, 'Oats', 50, NULL, 'GRAM', 190, 6.5, 30, 3.5, 5)")
@@ -31,7 +34,7 @@ class MigrationTest {
             close()
         }
 
-        helper.runMigrationsAndValidate(name, 3, true).close()
+        helper.runMigrationsAndValidate(name, LATEST, true).close()
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
