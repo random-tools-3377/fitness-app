@@ -103,7 +103,11 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
                 }
                 Switch(checked = settings.burnedHalf, onCheckedChange = { vm.setBurnedHalf(it) }, modifier = Modifier.testTag("burned-half"))
             }
+            WorkoutsPerWeekRow(vm, settings)
         }
+
+        RemindersSection(vm, settings)
+        PrivacySection(vm, settings)
 
         Section("Units") {
             Text(
@@ -135,6 +139,8 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
                 }
             }
         }
+
+        AutoBackupSection(vm)
 
         Section("About") {
             Text("Fitness App ${BuildConfig.VERSION_NAME}. Free, with no internet access.", style = MaterialTheme.typography.bodySmall)
@@ -248,6 +254,7 @@ fun TargetScreen(vm: MainViewModel, modifier: Modifier, back: () -> Unit) {
     var goal by remember { mutableStateOf(profile?.goal ?: WeightGoal.KEEP) }
     var rate by remember { mutableStateOf(profile?.kgPerWeek ?: 0.5) }
     var own by remember { mutableStateOf("") }
+    var goalWeight by remember { mutableStateOf(profile?.goalWeightKg?.let { Units.oneDecimal(Units.kgToShown(it, units.weight)) } ?: "") }
 
     // The weight starts at the latest weigh-in.
     LaunchedEffect(Unit) {
@@ -262,7 +269,8 @@ fun TargetScreen(vm: MainViewModel, modifier: Modifier, back: () -> Unit) {
     val birthYear = birth.toIntOrNull()
     val age = birthYear?.let { Targets.age(it, year) }
     val problems = Targets.problems(age, heightCm, weightKg)
-    val newProfile = if (problems.isEmpty()) Profile(sex, birthYear!!, heightCm!!, weightKg!!, activity, goal, rate) else null
+    val goalKg = Units.parse(goalWeight)?.let { Units.shownToKg(it, units.weight) }?.takeIf { it in 30.0..350.0 }
+    val newProfile = if (problems.isEmpty()) Profile(sex, birthYear!!, heightCm!!, weightKg!!, activity, goal, rate, goalKg) else null
     val result = newProfile?.let { vm.workedOut(it) }
 
     Column(modifier.fillMaxSize()) {
@@ -303,6 +311,7 @@ fun TargetScreen(vm: MainViewModel, modifier: Modifier, back: () -> Unit) {
                     }
                 }
             }
+            NumberField(goalWeight, { goalWeight = it }, "Goal weight (optional, for the stats)", "field:goal-weight", Modifier.fillMaxWidth(), suffix = units.weight.short)
             Text("Your aim", style = MaterialTheme.typography.labelLarge)
             Choices(WeightGoal.entries, goal, { it.title }, { "goal:${it.name}" }) { goal = it }
             if (goal != WeightGoal.KEEP) {

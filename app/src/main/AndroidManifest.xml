@@ -23,6 +23,9 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Reminders (0.4.0): set again after the phone restarts. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!--
         No phone backup and no phone-to-phone transfer: Google or Samsung backup would upload
         the diary. allowBackup="false" covers cloud backup; the rules files also exclude
@@ -55,6 +58,19 @@
             android:name="com.journeyapps.barcodescanner.CaptureActivity"
             android:screenOrientation="fullSensor"
             tools:replace="android:screenOrientation" />
+
+        <!-- Reminders, and setting them again after a restart or a change of clock. -->
+        <receiver
+            android:name=".reminders.ReminderReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- The rest timer's alarm. -->
         <receiver

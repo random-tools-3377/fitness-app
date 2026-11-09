@@ -162,6 +162,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
+            // Reminders are set again each time the app starts, in case the phone dropped them.
+            runCatching { io.github.randomtools3377.fitness.reminders.ReminderScheduler.schedule(getApplication(), repo.settingsOnce().reminders) }
+        }
+        viewModelScope.launch {
             builtIns.value = runCatching { repo.builtInFoods() }.getOrElse {
                 message.value = "The built-in food list could not be read."
                 emptyList()
@@ -169,7 +173,53 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // 0.4.0: reminders, the privacy lock, the automatic backup.
+
+    /** A reminder that opened the app: what it was about, like "WEIGH_IN". */
+    val openFromReminder = MutableStateFlow<String?>(null)
+
+    /** Tabs unlocked since the app was last opened. Leaving the app locks them again. */
+    val unlocked = MutableStateFlow<Set<String>>(emptySet())
+
+    fun markUnlocked(tab: String) { unlocked.value = unlocked.value + tab }
+    fun lockAgain() { unlocked.value = emptySet() }
+
+    fun setLocked(tabs: Set<String>) = launchSafely { repo.updateSettings { it.copy(locked = tabs) } }
+
+    fun setReminders(r: io.github.randomtools3377.fitness.core.ReminderSettings) = launchSafely {
+        repo.updateSettings { it.copy(reminders = r) }
+        io.github.randomtools3377.fitness.reminders.ReminderScheduler.schedule(getApplication(), r)
+    }
+
+    fun setWorkoutsPerWeek(n: Int) = launchSafely {
+        require(n in 1..14) { "Choose between 1 and 14 workouts a week." }
+        repo.updateSettings { it.copy(workoutsPerWeek = n) }
+    }
+
+    /** The automatic backup's folder, by its name, or null when it is off. */
+    val backupFolder = MutableStateFlow(io.github.randomtools3377.fitness.data.Backups.folderName(app))
+    val lastBackup = MutableStateFlow(io.github.randomtools3377.fitness.data.Backups.lastBackup(app))
+
+    fun setBackupFolder(uri: Uri?) = viewModelScope.launch {
+        try {
+            io.github.randomtools3377.fitness.data.Backups.setFolder(getApplication(), uri)
+            backupFolder.value = io.github.randomtools3377.fitness.data.Backups.folderName(getApplication())
+            if (uri != null) autoBackup()
+        } catch (e: Exception) {
+            message.value = "That folder can't be used. Choose another one."
+        }
+    }
+
+    private suspend fun autoBackup() {
+        val r = io.github.randomtools3377.fitness.data.Backups.autoBackupIfDue(getApplication(), today()) { repo.export(now()) }
+        if (r == io.github.randomtools3377.fitness.data.Backups.AutoResult.FolderGone) {
+            message.value = "The automatic backup couldn't write to its folder. Choose the folder again in Settings."
+        }
+        lastBackup.value = io.github.randomtools3377.fitness.data.Backups.lastBackup(getApplication())
+    }
+
     fun onAppOpened() {
+        viewModelScope.launch { runCatching { autoBackup() } }
         val t = today()
         if (t != lastOpened) {
             // A new day began while the app was closed: show it, unless another day was picked.
@@ -388,6 +438,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.IO) {
                 resolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray(Charsets.UTF_8)) }
             }
+            io.github.randomtools3377.fitness.data.Backups.markBackedUp(getApplication())
+            lastBackup.value = io.github.randomtools3377.fitness.data.Backups.lastBackup(getApplication())
             message.value = "Exported everything to the file"
         } catch (e: Exception) {
             message.value = "The file could not be written."

@@ -241,6 +241,9 @@ interface FitnessDao {
     @Query("SELECT * FROM entries ORDER BY day, createdAt, id")
     suspend fun allEntries(): List<EntryRow>
 
+    @Query("SELECT * FROM entries ORDER BY day, createdAt, id")
+    fun entriesFlow(): Flow<List<EntryRow>>
+
     @Query("SELECT * FROM entries WHERE id = :id")
     suspend fun entry(id: Long): EntryRow?
 
@@ -291,6 +294,9 @@ interface FitnessDao {
 
     @Query("SELECT * FROM water ORDER BY day, at, id")
     suspend fun allWater(): List<WaterRow>
+
+    @Query("SELECT * FROM water ORDER BY day, at, id")
+    fun waterFlow(): Flow<List<WaterRow>>
 
     @Insert
     suspend fun insertWater(rows: List<WaterRow>)

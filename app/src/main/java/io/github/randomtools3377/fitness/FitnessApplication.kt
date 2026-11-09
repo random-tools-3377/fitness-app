@@ -5,6 +5,7 @@ import android.app.Application
 import android.os.Bundle
 import io.github.randomtools3377.fitness.data.AppDatabase
 import io.github.randomtools3377.fitness.data.Repository
+import io.github.randomtools3377.fitness.reminders.ReminderScheduler
 import io.github.randomtools3377.fitness.workout.RestTimer
 
 class FitnessApplication : Application() {
@@ -20,6 +21,7 @@ class FitnessApplication : Application() {
         super.onCreate()
         RestTimer.createChannel(this)
         RestTimer.restore(this)
+        ReminderScheduler.createChannel(this)
         registerActivityLifecycleCallbacks(
             object : ActivityLifecycleCallbacks {
                 override fun onActivityStarted(activity: Activity) { started++ }

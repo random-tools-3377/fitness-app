@@ -111,6 +111,10 @@ class Repository(private val context: Context, val db: AppDatabase) {
     suspend fun updateEntry(entry: DiaryEntry) = dao.updateEntry(entry.toRow())
     suspend fun deleteEntry(id: Long) = dao.deleteEntry(id)
 
+    /** The whole diary and all water, for the stats and streaks (0.4.0). */
+    val allEntries: Flow<List<DiaryEntry>> = dao.entriesFlow().map { r -> r.map { it.toCore() } }
+    val allWater: Flow<List<WaterEntry>> = dao.waterFlow().map { r -> r.map { it.toCore() } }
+
     // Saved meals.
     val savedMeals: Flow<List<SavedMeal>> = combine(dao.savedMeals(), dao.savedMealItems()) { m, i -> savedMealsOf(m, i) }
 

@@ -12,3 +12,10 @@ android.permission.VIBRATE
 
 # Barcode scanning (0.3.0), asked for the first time the user scans. ZXing reads the image on the phone.
 android.permission.CAMERA
+
+# Reminders (0.4.0) are set again after the phone restarts.
+android.permission.RECEIVE_BOOT_COMPLETED
+
+# The privacy lock (0.4.0) asks for the phone's own fingerprint, face or PIN.
+android.permission.USE_BIOMETRIC
+android.permission.USE_FINGERPRINT

@@ -1,6 +1,16 @@
 package io.github.randomtools3377.fitness.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -35,7 +45,7 @@ enum class Tab(val title: String, val icon: ImageVector) {
     DIARY("Diary", Icons.Filled.DateRange),
     FOODS("Foods", Icons.AutoMirrored.Filled.List),
     WORKOUTS("Workouts", Icons.Filled.PlayArrow),
-    WEIGHT("Weight", Icons.Filled.Favorite),
+    PROGRESS("Progress", Icons.Filled.Favorite),
     SETTINGS("Settings", Icons.Filled.Settings),
 }
 
@@ -59,7 +69,7 @@ sealed interface Route {
 }
 
 @Composable
-fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel) {
+fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel) {
     var tab by rememberSaveable { mutableStateOf(Tab.DIARY) }
     val stack = remember { mutableStateListOf<Route>() }
     val snackbar = remember { SnackbarHostState() }
@@ -67,6 +77,20 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel) {
     val workoutMessage by wvm.message.collectAsState()
     val offer by vm.targetOffer.collectAsState()
     val units by vm.units.collectAsState()
+    val settings by vm.settings.collectAsState()
+    val unlocked by vm.unlocked.collectAsState()
+    val fromReminder by vm.openFromReminder.collectAsState()
+    var progressPart by rememberSaveable { mutableStateOf("stats") }
+
+    // A reminder opens the screen it is about.
+    LaunchedEffect(fromReminder) {
+        when (fromReminder ?: return@LaunchedEffect) {
+            "WORKOUT" -> tab = Tab.WORKOUTS
+            "WEIGH_IN" -> { tab = Tab.PROGRESS; progressPart = "weight" }
+            else -> tab = Tab.DIARY
+        }
+        vm.openFromReminder.value = null
+    }
 
     LaunchedEffect(message) {
         val m = message ?: return@LaunchedEffect
@@ -105,12 +129,21 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel) {
     ) { padding ->
         val modifier = Modifier.padding(padding)
         when (val top = stack.lastOrNull()) {
-            null -> when (tab) {
-                Tab.DIARY -> DiaryScreen(vm, modifier, open = ::open)
-                Tab.FOODS -> FoodsScreen(vm, modifier, open = ::open)
-                Tab.WORKOUTS -> WorkoutsScreen(wvm, vm, modifier, open = ::open)
-                Tab.WEIGHT -> WeightScreen(vm, modifier)
-                Tab.SETTINGS -> SettingsScreen(vm, modifier, open = ::open)
+            null -> if (tab.name in settings.locked && tab.name !in unlocked) {
+                LockedScreen(modifier, onUnlocked = { vm.markUnlocked(tab.name) })
+            } else {
+                when (tab) {
+                    Tab.DIARY -> DiaryScreen(vm, modifier, open = ::open)
+                    Tab.FOODS -> FoodsScreen(vm, modifier, open = ::open)
+                    Tab.WORKOUTS -> WorkoutsScreen(wvm, vm, modifier, open = ::open)
+                    Tab.PROGRESS -> Column(modifier) {
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            Choices(listOf("stats", "weight"), progressPart, { if (it == "stats") "Stats and streaks" else "Weight" }, { "progress:$it" }) { progressPart = it }
+                        }
+                        if (progressPart == "stats") StatsScreen(svm, Modifier) else WeightScreen(vm, Modifier)
+                    }
+                    Tab.SETTINGS -> SettingsScreen(vm, modifier, open = ::open)
+                }
             }
             is Route.AddFood -> AddFoodScreen(
                 vm, top.meal, top.openFoodKey, modifier,
@@ -153,5 +186,18 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel) {
                 TextButton(onClick = { vm.answerOffer(false) }, modifier = Modifier.testTag("decline-offer")) { Text("Keep mine") }
             },
         )
+    }
+}
+
+/** A tab behind the privacy lock: opens with the phone's own fingerprint, face or PIN. */
+@Composable
+private fun LockedScreen(modifier: Modifier, onUnlocked: () -> Unit) {
+    val unlock = rememberUnlock(onUnlocked)
+    LaunchedEffect(Unit) { unlock() }
+    Column(modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(48.dp))
+        Text("Locked", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 12.dp))
+        Text("This part of the app is behind your phone's lock.", modifier = Modifier.padding(vertical = 8.dp))
+        Button(onClick = unlock, modifier = Modifier.testTag("unlock")) { Text("Unlock") }
     }
 }
