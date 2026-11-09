@@ -564,10 +564,12 @@ interface FitnessDao {
         FastRow::class,
         // Version 7 (0.8.0): measurements, sleep and mood, habits, progress photos.
         MeasurementRow::class, DayNoteRow::class, HabitRow::class, HabitTickRow::class, PhotoRow::class,
+        // Version 10 (0.12.0): cycle tracking.
+        PeriodRow::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao

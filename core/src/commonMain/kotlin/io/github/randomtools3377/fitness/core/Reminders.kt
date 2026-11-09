@@ -21,16 +21,17 @@ data class ReminderTime(
 }
 
 /** What kind of reminder, for its words and where it opens. */
-enum class ReminderKind { MEAL, WATER, WORKOUT, WEIGH_IN }
+enum class ReminderKind { MEAL, WATER, WORKOUT, WEIGH_IN, SUPPLEMENT }
 
 /** One reminder due: what, and when. */
-data class DueReminder(val kind: ReminderKind, val at: LocalDateTime, val meal: Meal? = null) {
+data class DueReminder(val kind: ReminderKind, val at: LocalDateTime, val meal: Meal? = null, val label: String? = null) {
     val text: String
         get() = when (kind) {
             ReminderKind.MEAL -> "Time to log ${meal?.title?.lowercase() ?: "a meal"}"
             ReminderKind.WATER -> "Time for a glass of water"
             ReminderKind.WORKOUT -> "Time for a workout"
             ReminderKind.WEIGH_IN -> "Time to weigh in"
+            ReminderKind.SUPPLEMENT -> "Time for: ${label ?: "your supplements"}"
         }
 }
 
@@ -48,6 +49,8 @@ data class ReminderSettings(
     val waterTo: Int = 21 * 60,
     val workout: ReminderTime? = null,
     val weighIn: ReminderTime? = null,
+    /** Supplement and medication reminders (0.12.0): minutes after midnight to the names due then. */
+    val supplements: Map<Int, String> = emptyMap(),
 ) {
     /** Every reminder due from [now] (exclusive) to [until] (inclusive), soonest first. */
     fun due(now: LocalDateTime, until: LocalDateTime): List<DueReminder> {
@@ -68,6 +71,7 @@ data class ReminderSettings(
             }
             workout?.let { include(it, ReminderKind.WORKOUT) }
             weighIn?.let { include(it, ReminderKind.WEIGH_IN) }
+            for ((minute, names) in supplements) out += DueReminder(ReminderKind.SUPPLEMENT, at(minute), label = names)
             d = d.plus(DatePeriod(days = 1))
         }
         return out.filter { it.at > now && it.at <= until }.sortedBy { it.at }
@@ -77,10 +81,16 @@ data class ReminderSettings(
     fun next(now: LocalDateTime): DueReminder? =
         due(now, LocalDateTime(now.date.plus(DatePeriod(days = 8)), LocalTime(0, 0))).firstOrNull()
 
-    val anyOn: Boolean get() = meals.values.any { it.on } || waterOn || workout?.on == true || weighIn?.on == true
+    val anyOn: Boolean get() = meals.values.any { it.on } || waterOn || workout?.on == true || weighIn?.on == true || supplements.isNotEmpty()
 
     companion object {
         fun iso(d: DayOfWeek): Int = d.ordinal + 1
+
+        /** The supplement reminders from the daily list: each time, with the names due then. */
+        fun supplementTimes(habits: List<Habit>): Map<Int, String> =
+            habits.filter { it.kind == HabitKind.SUPPLEMENT && !it.archived && it.reminderMinute != null }
+                .groupBy { it.reminderMinute!! }
+                .mapValues { (_, l) -> l.joinToString(", ") { it.name } }
 
         /** Usual times to start from when a meal reminder is turned on. */
         val MEAL_TIMES = mapOf(Meal.BREAKFAST to 8 * 60, Meal.LUNCH to 12 * 60 + 30, Meal.DINNER to 19 * 60, Meal.SNACKS to 16 * 60)

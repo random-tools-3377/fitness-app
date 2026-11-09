@@ -47,6 +47,8 @@ data class AppSettings(
     val dietBreak: DietBreak? = null,
     /** Grams of alcohol in a standard drink; null follows the phone's region (0.11.0). */
     val drinkGrams: Double? = null,
+    /** Cycle tracking is on (0.12.0); off to start. */
+    val cycleOn: Boolean = false,
     /** The Monday whose weekly check-in the user has seen and closed (0.8.0). */
     val checkInSeen: kotlinx.datetime.LocalDate? = null,
 ) {
@@ -98,12 +100,14 @@ data class Backup(
     val dayNotes: List<DayNote> = emptyList(),
     val habits: List<Habit> = emptyList(),
     val habitTicks: List<HabitTick> = emptyList(),
+    /** Periods, for cycle tracking (format 5). */
+    val periods: List<Period> = emptyList(),
 ) {
     companion object {
         const val APP = "fitness"
 
         /** Raised whenever the file's layout changes in a way older versions can't read. */
-        const val FORMAT = 4
+        const val FORMAT = 5
 
         private val json = Json {
             prettyPrint = true

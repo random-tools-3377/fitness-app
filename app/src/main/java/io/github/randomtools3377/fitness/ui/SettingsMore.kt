@@ -172,6 +172,17 @@ fun PrivacySection(vm: MainViewModel, settings: AppSettings) {
                 Text(tab.title)
             }
         }
+        // Cycle tracking (0.12.0) lives with privacy: it's off until turned on.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Cycle tracking")
+                Text(
+                    "Log periods under Progress → Body; the weight chart marks them. Kept on this phone, behind the lock when Progress is locked.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(checked = settings.cycleOn, onCheckedChange = { vm.setCycleOn(it) }, modifier = Modifier.testTag("cycle-on"))
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Text("The app is hidden in the recent-apps screen.", style = MaterialTheme.typography.bodySmall)
         } else {

@@ -80,6 +80,10 @@ data class Habit(
     val createdAt: Long = 0,
     /** Stopped: off the daily list, kept with its history. */
     val archived: Boolean = false,
+    /** A habit, or a supplement or medicine (0.12.0). */
+    val kind: HabitKind = HabitKind.HABIT,
+    /** A reminder at this many minutes after midnight, if wanted (0.12.0). */
+    val reminderMinute: Int? = null,
 )
 
 /** A habit done on a day. */
@@ -95,7 +99,7 @@ object Habits {
 
     fun problem(name: String, existing: List<Habit>): String? = when {
         name.isBlank() -> "Give the habit a name."
-        existing.any { !it.archived && it.name.equals(name.trim(), ignoreCase = true) } -> "There is already a habit called that."
+        existing.any { !it.archived && it.name.equals(name.trim(), ignoreCase = true) } -> "There is already one called that."
         else -> null
     }
 }

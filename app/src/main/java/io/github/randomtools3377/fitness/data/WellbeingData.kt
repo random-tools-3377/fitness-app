@@ -44,6 +44,17 @@ data class HabitRow(
     val name: String,
     val createdAt: Long,
     val archived: Boolean,
+    /** Version 10 (0.12.0): a habit or a supplement, and an optional reminder time. */
+    @androidx.room.ColumnInfo(defaultValue = "HABIT") val kind: String = "HABIT",
+    val reminderMinute: Int? = null,
+)
+
+/** A period, for cycle tracking (version 10, 0.12.0). */
+@Entity(tableName = "periods", indices = [Index("start")])
+data class PeriodRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val start: Long,
+    val end: Long?,
 )
 
 @Entity(tableName = "habit_ticks", primaryKeys = ["habitId", "day"])
@@ -84,6 +95,12 @@ interface WellbeingDao {
     @Query("DELETE FROM habit_ticks WHERE habitId = :habitId AND day = :day") suspend fun deleteHabitTick(habitId: Long, day: Long)
     @Query("DELETE FROM habit_ticks") suspend fun clearHabitTicks()
 
+    @Query("SELECT * FROM periods ORDER BY start") fun periods(): Flow<List<PeriodRow>>
+    @Query("SELECT * FROM periods ORDER BY start") suspend fun allPeriods(): List<PeriodRow>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putPeriods(rows: List<PeriodRow>)
+    @Query("DELETE FROM periods WHERE id = :id") suspend fun deletePeriod(id: Long)
+    @Query("DELETE FROM periods") suspend fun clearPeriods()
+
     @Query("SELECT * FROM photos ORDER BY day DESC, at DESC") fun photos(): Flow<List<PhotoRow>>
     @Insert suspend fun insertPhoto(row: PhotoRow): Long
     @Query("SELECT * FROM photos WHERE id = :id") suspend fun photo(id: Long): PhotoRow?
@@ -94,8 +111,14 @@ fun MeasurementRow.toCore() = Measurement(id, dayOf(day), MeasureKind.valueOf(ki
 fun Measurement.toRow() = MeasurementRow(id, day.toDay(), kind.name, value, at)
 fun DayNoteRow.toCore() = DayNote(dayOf(day), sleepHours, mood, text)
 fun DayNote.toRow() = DayNoteRow(day.toDay(), sleepHours, mood, text)
-fun HabitRow.toCore() = Habit(id, name, createdAt, archived)
-fun Habit.toRow() = HabitRow(id, name, createdAt, archived)
+fun HabitRow.toCore() = Habit(
+    id, name, createdAt, archived,
+    runCatching { io.github.randomtools3377.fitness.core.HabitKind.valueOf(kind) }.getOrDefault(io.github.randomtools3377.fitness.core.HabitKind.HABIT),
+    reminderMinute,
+)
+fun Habit.toRow() = HabitRow(id, name, createdAt, archived, kind.name, reminderMinute)
+fun PeriodRow.toCore() = io.github.randomtools3377.fitness.core.Period(id, dayOf(start), end?.let { dayOf(it) })
+fun io.github.randomtools3377.fitness.core.Period.toRow() = PeriodRow(id, start.toDay(), end?.toDay())
 fun HabitTickRow.toCore() = HabitTick(habitId, dayOf(day))
 fun HabitTick.toRow() = HabitTickRow(habitId, day.toDay())
 

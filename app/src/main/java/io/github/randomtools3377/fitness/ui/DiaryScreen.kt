@@ -194,6 +194,9 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
         }
         // Habits and sleep and mood for the day shown (0.8.0).
         item(key = "habits") { HabitsCard(bvm, day) }
+        item(key = "supplements") {
+            HabitsCard(bvm, day, io.github.randomtools3377.fitness.core.HabitKind.SUPPLEMENT, "Supplements and medication")
+        }
         item(key = "sleep") { SleepMoodCard(bvm, day) }
         item { Spacer(Modifier.height(24.dp)) }
     }

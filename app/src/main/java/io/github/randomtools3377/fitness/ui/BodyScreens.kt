@@ -144,6 +144,7 @@ fun MeasurementsScreen(bvm: BodyViewModel, modifier: Modifier) {
     val all by bvm.measurements.collectAsState()
     val photos by bvm.photos.collectAsState()
     val units by bvm.units.collectAsState()
+    val bodySettings by bvm.settings.collectAsState()
     val typed = remember { mutableStateMapOf<MeasureKind, String>() }
     var deleting by remember { mutableStateOf<Measurement?>(null) }
     var viewing by remember { mutableStateOf<io.github.randomtools3377.fitness.data.PhotoRow?>(null) }
@@ -187,12 +188,14 @@ fun MeasurementsScreen(bvm: BodyViewModel, modifier: Modifier) {
                         }.orEmpty()
                         LabelValue(k.title, measureText(m, units) + change, tag = "latest:${k.name}")
                     }
+                    BodyFatEstimate(bvm)
                     if (MeasureKind.BODY_FAT in latest) {
                         Text("Body fat from a scale or calipers is a rough guide; the trend matters more than one number.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         }
+        if (bodySettings.cycleOn) item { CycleSection(bvm) }
         item {
             Section("Progress photos") {
                 Text(
@@ -307,7 +310,7 @@ fun HabitsScreen(bvm: BodyViewModel, kcalByDay: Map<LocalDate, Double>, modifier
                     Box(Modifier.weight(1f)) { TextInput(name, { name = it }, "New habit, like \"Stretch 10 minutes\"", "field:habit") }
                     Button(onClick = { bvm.addHabit(name); name = "" }, enabled = name.isNotBlank(), modifier = Modifier.testTag("add-habit")) { Text("Add") }
                 }
-                for (h in habits.filter { !it.archived }) {
+                for (h in habits.filter { !it.archived && it.kind == io.github.randomtools3377.fitness.core.HabitKind.HABIT }) {
                     val s = streaks[h.id]
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("habit:${h.name}")) {
                         Column(Modifier.weight(1f)) {
@@ -322,7 +325,7 @@ fun HabitsScreen(bvm: BodyViewModel, kcalByDay: Map<LocalDate, Double>, modifier
                         TextButton(onClick = { bvm.archiveHabit(h, true) }) { Text("Stop") }
                     }
                 }
-                val stopped = habits.filter { it.archived }
+                val stopped = habits.filter { it.archived && it.kind == io.github.randomtools3377.fitness.core.HabitKind.HABIT }
                 if (stopped.isNotEmpty()) {
                     Text("Stopped", style = MaterialTheme.typography.labelLarge)
                     for (h in stopped) {
@@ -334,6 +337,7 @@ fun HabitsScreen(bvm: BodyViewModel, kcalByDay: Map<LocalDate, Double>, modifier
                 }
             }
         }
+        item { SupplementsSection(bvm) }
         item {
             Section("Sleep and mood, the last 14 days") {
                 Text("Next to what you ate, to spot patterns. Fill them in on the diary.", style = MaterialTheme.typography.bodySmall)
@@ -362,12 +366,17 @@ fun HabitsScreen(bvm: BodyViewModel, kcalByDay: Map<LocalDate, Double>, modifier
 
 /** On the diary: ticking the user's habits for the day shown. */
 @Composable
-fun HabitsCard(bvm: BodyViewModel, day: LocalDate) {
+fun HabitsCard(
+    bvm: BodyViewModel,
+    day: LocalDate,
+    kind: io.github.randomtools3377.fitness.core.HabitKind = io.github.randomtools3377.fitness.core.HabitKind.HABIT,
+    title: String = "Habits",
+) {
     val habits by bvm.habits.collectAsState()
     val ticks by bvm.ticks.collectAsState()
-    val active = habits.filter { !it.archived }
+    val active = habits.filter { !it.archived && it.kind == kind }
     if (active.isEmpty()) return
-    Section("Habits") {
+    Section(title) {
         for (h in active) {
             val done = ticks.any { it.habitId == h.id && it.day == day }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { bvm.tick(h, day, !done) }) {
@@ -405,5 +414,107 @@ fun SleepMoodCard(bvm: BodyViewModel, day: LocalDate) {
                 )
             }
         }
+    }
+}
+
+/** Supplements and medication (0.12.0): a daily tick list, each with an optional reminder. */
+@Composable
+private fun SupplementsSection(bvm: BodyViewModel) {
+    val habits by bvm.habits.collectAsState()
+    var name by remember { mutableStateOf("") }
+    var time by remember { mutableStateOf("") }
+    val kind = io.github.randomtools3377.fitness.core.HabitKind.SUPPLEMENT
+    Section("Supplements and medication") {
+        Text(
+            "A daily list to tick off in the diary, with a reminder if you like. The app gives no advice about them; " +
+                "follow your doctor or pharmacist. Reminders show only \"A reminder from Fitness App\" on the lock screen.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(1f)) { TextInput(name, { name = it }, "Name, like \"Vitamin D\"", "field:supplement") }
+            androidx.compose.material3.OutlinedTextField(
+                value = time,
+                onValueChange = { t -> time = t.filter { it.isDigit() || it == ':' }.take(5) },
+                label = { Text("Time") },
+                placeholder = { Text("08:00") },
+                singleLine = true,
+                isError = time.isNotBlank() && parseClock(time) == null,
+                modifier = Modifier.width(90.dp).testTag("field:supplement-time"),
+            )
+        }
+        Button(
+            onClick = { bvm.addItem(name, kind, time.takeIf { it.isNotBlank() }?.let { parseClock(it) }); name = ""; time = "" },
+            enabled = name.isNotBlank() && (time.isBlank() || parseClock(time) != null),
+            modifier = Modifier.testTag("add-supplement"),
+        ) { Text("Add") }
+        for (h in habits.filter { it.kind == kind && !it.archived }) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("supplement:${h.name}")) {
+                Column(Modifier.weight(1f)) {
+                    Text(h.name)
+                    Text(h.reminderMinute?.let { "Reminder at ${clockText(it)}" } ?: "No reminder", style = MaterialTheme.typography.bodySmall)
+                }
+                if (h.reminderMinute != null) TextButton(onClick = { bvm.setReminder(h, null) }) { Text("No reminder") }
+                TextButton(onClick = { bvm.archiveHabit(h, true) }) { Text("Stop") }
+            }
+        }
+    }
+}
+
+/** A person's own estimate from tape measurements (0.12.0). */
+@Composable
+fun BodyFatEstimate(bvm: BodyViewModel) {
+    val all by bvm.measurements.collectAsState()
+    val settings by bvm.settings.collectAsState()
+    val p = settings.profile ?: return
+    val pct = io.github.randomtools3377.fitness.core.BodyFat.latest(p, all)
+    Text(
+        if (pct != null) "Estimated body fat: ${formatAmount(pct)} % (US Navy formula, from your height, waist and neck" +
+            (if (p.sex == io.github.randomtools3377.fitness.core.Sex.FEMALE) " and hips" else "") + "). An estimate, often a few points off."
+        else "For a body-fat estimate, measure your waist and neck" + (if (p.sex == io.github.randomtools3377.fitness.core.Sex.FEMALE) " and hips" else "") + ".",
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.testTag("bodyfat-estimate"),
+    )
+}
+
+/** Cycle tracking (0.12.0): period days, the average cycle and the next one, estimated. */
+@Composable
+fun CycleSection(bvm: BodyViewModel) {
+    val periods by bvm.periods.collectAsState()
+    val today = bvm.today()
+    val summary = io.github.randomtools3377.fitness.core.Cycle.summary(periods, today)
+    val going = periods.lastOrNull { it.end == null }
+    var deleting by remember { mutableStateOf<io.github.randomtools3377.fitness.core.Period?>(null) }
+    Section("Cycle") {
+        Text(
+            "Weight often goes up a little around a period, from water. The weight chart marks period days so that's easier to see. " +
+                "Dates ahead are estimates from your average cycle; this is not for planning or avoiding pregnancy, and it gives no medical advice.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (going == null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { bvm.startPeriod(today) }, modifier = Modifier.testTag("period-start")) { Text("Period started today") }
+                TextButton(onClick = { bvm.startPeriod(today.minus(DatePeriod(days = 1))) }) { Text("Yesterday") }
+            }
+        } else {
+            Text("Period since ${dayName(going.start, today)}", modifier = Modifier.testTag("period-going"))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { bvm.endPeriod(going, today) }, modifier = Modifier.testTag("period-end")) { Text("Last day today") }
+                TextButton(onClick = { bvm.endPeriod(going, today.minus(DatePeriod(days = 1))) }) { Text("Yesterday") }
+            }
+        }
+        summary.dayOfCycle?.let { LabelValue("Day of cycle", "$it", tag = "cycle-day") }
+        summary.averageLength?.let { LabelValue("Average cycle", "$it days", tag = "cycle-average") }
+        summary.nextStart?.let { LabelValue("Next period, estimated", dayName(it, today), tag = "cycle-next") }
+        for (p in periods.reversed().take(12)) {
+            Row(Modifier.fillMaxWidth().clickable { deleting = p }.padding(vertical = 4.dp)) {
+                Text(dayName(p.start, today) + " – " + (p.end?.let { dayName(it, today) } ?: "going"), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+    deleting?.let { p ->
+        ConfirmDialog(
+            "Delete this period?", "From ${p.start}" + (p.end?.let { " to $it" } ?: "") + ".", "Delete",
+            onConfirm = { bvm.deletePeriod(p.id); deleting = null }, onDismiss = { deleting = null },
+        )
     }
 }

@@ -219,6 +219,11 @@ class Repository(private val context: Context, val db: AppDatabase) {
     suspend fun tickHabit(habitId: Long, day: kotlinx.datetime.LocalDate, done: Boolean) =
         if (done) well.insertHabitTicks(listOf(HabitTickRow(habitId, day.toDay()))) else well.deleteHabitTick(habitId, day.toDay())
 
+    // Cycle tracking (0.12.0).
+    val periods: Flow<List<io.github.randomtools3377.fitness.core.Period>> = well.periods().map { r -> r.map { it.toCore() } }
+    suspend fun putPeriod(p: io.github.randomtools3377.fitness.core.Period) = well.putPeriods(listOf(p.toRow()))
+    suspend fun deletePeriod(id: Long) = well.deletePeriod(id)
+
     val photos: Flow<List<PhotoRow>> = well.photos()
     suspend fun addPhoto(uri: android.net.Uri, day: kotlinx.datetime.LocalDate, now: Long): Long {
         val name = Photos.keep(context, uri, now)
@@ -324,6 +329,7 @@ class Repository(private val context: Context, val db: AppDatabase) {
                 dayNotes = well.allDayNotes().map { it.toCore() },
                 habits = well.allHabits().map { it.toCore() },
                 habitTicks = well.allHabitTicks().map { it.toCore() },
+                periods = well.allPeriods().map { it.toCore() },
             )
         }
         return Backup.encode(backup)
@@ -359,6 +365,8 @@ class Repository(private val context: Context, val db: AppDatabase) {
             well.putDayNotes(backup.dayNotes.map { it.toRow() })
             well.putHabits(backup.habits.map { it.toRow() })
             well.insertHabitTicks(backup.habitTicks.map { it.toRow() })
+            well.clearPeriods()
+            well.putPeriods(backup.periods.map { it.toRow() })
             dao.insertFoods(backup.foods.map { it.toRow(now) })
             dao.insertEntries(backup.entries.map { it.toRow() })
             for (meal in backup.savedMeals) {

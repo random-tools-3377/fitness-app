@@ -42,6 +42,9 @@ import kotlinx.datetime.LocalDate
 fun WeightScreen(vm: MainViewModel, modifier: Modifier) {
     val weighIns by vm.weighIns.collectAsState()
     val units by vm.units.collectAsState()
+    val settings by vm.settings.collectAsState()
+    val periods by vm.periods.collectAsState()
+    val periodDays = remember(periods) { io.github.randomtools3377.fitness.core.Cycle.periodDays(periods, vm.today()) }
     var text by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf<WeighIn?>(null) }
     val today = vm.today()
@@ -70,7 +73,8 @@ fun WeightScreen(vm: MainViewModel, modifier: Modifier) {
                 if (weighIns.size < 2) {
                     Text("The chart appears after two weigh-ins.", style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    WeightChart(weighIns, toShown = { Units.kgToShown(it, units.weight) })
+                    WeightChart(weighIns, toShown = { Units.kgToShown(it, units.weight) }, periodDays = if (settings.cycleOn) periodDays else emptySet())
+                    if (settings.cycleOn && periodDays.isNotEmpty()) Legend(MaterialTheme.colorScheme.tertiaryContainer, "Period days")
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Legend(MaterialTheme.colorScheme.outline, "Weigh-ins")
                         Legend(MaterialTheme.colorScheme.primary, "7-day average")
@@ -115,7 +119,8 @@ private fun Legend(color: Color, text: String) {
 
 /** Weigh-ins as dots and the 7-day average as a line, drawn by the app itself. */
 @Composable
-private fun WeightChart(weighIns: List<WeighIn>, toShown: (Double) -> Double) {
+private fun WeightChart(weighIns: List<WeighIn>, toShown: (Double) -> Double, periodDays: Set<LocalDate> = emptySet()) {
+    val shade = MaterialTheme.colorScheme.tertiaryContainer
     val daily = Weight.daily(weighIns)
     val average = Weight.sevenDayAverage(weighIns)
     val dots = MaterialTheme.colorScheme.outline
@@ -134,6 +139,12 @@ private fun WeightChart(weighIns: List<WeighIn>, toShown: (Double) -> Double) {
             val spanDays = (last - first).coerceAtLeast(1)
             fun x(d: LocalDate) = (d.toEpochDays() - first).toFloat() / spanDays * size.width
             fun y(v: Double) = ((hi - toShown(v)) / (hi - lo)).toFloat() * size.height
+            // Period days (0.12.0), shaded behind the weigh-ins.
+            val dayWidth = (size.width / spanDays).coerceAtLeast(2f)
+            for (d in periodDays) {
+                val e = d.toEpochDays()
+                if (e in first..last) drawRect(shade, topLeft = Offset(x(d) - dayWidth / 2, 0f), size = androidx.compose.ui.geometry.Size(dayWidth, size.height))
+            }
             for (i in 0..4) {
                 val gy = size.height * i / 4f
                 drawLine(grid, Offset(0f, gy), Offset(size.width, gy), strokeWidth = 1f)
