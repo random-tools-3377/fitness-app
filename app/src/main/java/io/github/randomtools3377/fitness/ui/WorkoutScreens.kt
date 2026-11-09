@@ -69,6 +69,7 @@ import io.github.randomtools3377.fitness.core.Best
 import io.github.randomtools3377.fitness.core.Exercise
 import io.github.randomtools3377.fitness.core.ExerciseKind
 import io.github.randomtools3377.fitness.core.Exercises
+import io.github.randomtools3377.fitness.core.SavedWorkout
 import io.github.randomtools3377.fitness.core.UnitSettings
 import io.github.randomtools3377.fitness.core.Units
 import io.github.randomtools3377.fitness.core.Workout
