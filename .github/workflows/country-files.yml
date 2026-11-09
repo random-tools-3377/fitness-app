@@ -1,0 +1,38 @@
+name: Country files
+
+# Builds the country files for barcode scanning from Open Food Facts (and, for the United
+# States, USDA's Branded Foods) with tools/build-country-files.py, and publishes them on the
+# "countries" Release, which is never marked as the latest app version. Runs once a month, or
+# when started from the Actions tab. Uses no signing secrets and never runs pull request code.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 3 2 * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: country-files
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and publish the country files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the country files
+        run: python3 tools/build-country-files.py --work "$RUNNER_TEMP/data" --out "$RUNNER_TEMP/countries"
+
+      - name: Publish them on the "countries" Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ runner.temp }}/countries
+        run: scripts/publish-country-files.sh "$OUT"
