@@ -22,6 +22,9 @@ PY
   echo "----- $file"
   cat "$file"
   echo
+  # The same file as one line (gzip, then base64), to copy out of the log exactly:
+  #   echo '<line>' | base64 -d | gunzip > the/file.json
+  echo "Compressed: $(gzip -9c "$file" | base64 -w0)"
   failed=1
 done <<< "$status"
 if [ "$failed" != 0 ]; then
