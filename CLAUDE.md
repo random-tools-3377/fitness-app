@@ -46,8 +46,8 @@ workouts or exports.
   offline version and ask the owner.
 - No phone backup **(default)**: `android:allowBackup="false"` and data-extraction rules that
   exclude everything. The backup is the export file.
-- The camera is the only extra permission, for scanning barcodes, asked the first time the user
-  scans **(default)**. Scanning uses ZXing (Apache-2.0), which works offline, not Google's
+- The camera is an extra permission, for scanning barcodes, asked the first time the user
+  scans **(default)**; so is the microphone, only for the optional voice part (see "On-phone AI"). Scanning uses ZXing (Apache-2.0), which works offline, not Google's
   scanner, which needs Play Services **(default)**.
 
 ## Food
@@ -364,11 +364,11 @@ Decided on 2026-11-09: AI features are added, on these terms.
   recipe; reading labels better than Tesseract; and a weekly summary in plain words. No camera
   rep counter.
 - **Details (default):**
-  - The models are files on a "models" Release, each with its licence and credit, using only
-    models whose licences let them be passed on (Apache-2.0, MIT or similar): a small text model
-    for meals, recipes and the summary (Qwen2.5 1.5B Instruct, run with llama.cpp); a speech model
-    for voice (Whisper, run with whisper.cpp); a small vision model for plate photos (SmolVLM);
-    and PaddleOCR's mobile models for labels.
+  - The models are files on the "AI models (optional)" Release, each with its licence and
+    credit, using only models whose licences let them be passed on (Apache-2.0, MIT or similar):
+    Qwen3 1.7B for meals, recipes and the summary; Qwen3-ASR 0.6B for voice; SmolVLM 500M for
+    plate photos; all run with llama.cpp, built into the app for 64-bit ARM phones. PaddleOCR's
+    mobile models, run with ONNX Runtime, read labels.
   - The model only picks words; the app's own food data gives the numbers. A meal or recipe
     becomes foods from the user's foods and the built-in lists, with amounts, shown as a list to
     tick and change. Plate photos only suggest foods; the amounts are the user's.
