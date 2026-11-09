@@ -225,7 +225,7 @@ private fun LogCardioDialog(exercises: List<Exercise>, units: UnitSettings, onLo
         title = { Text("Log cardio") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Choices(exercises, picked, { it.name }, { "cardio:${it.name}" }) { picked = it }
+                picked?.let { sel -> Choices(exercises, sel, { it.name }, { "cardio:${it.name}" }) { picked = it } }
                 NumberField(minutes, { minutes = it }, "How long", "field:cardio-minutes", Modifier.fillMaxWidth(), suffix = "min")
                 NumberField(distance, { distance = it }, "How far (optional)", "field:cardio-distance", Modifier.fillMaxWidth(), suffix = units.distance.short)
                 Text("With a distance, the calories come from your speed.", style = MaterialTheme.typography.bodySmall)
