@@ -62,6 +62,7 @@ import kotlin.math.roundToInt
 fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
     val settings by vm.settings.collectAsState()
     val units by vm.units.collectAsState()
+    val european by vm.hasEuropeanFoods.collectAsState()
     val scope = rememberCoroutineScope()
     var importing by remember { mutableStateOf<Backup?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
@@ -125,9 +126,10 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
             Text("Fitness App ${BuildConfig.VERSION_NAME}. Free, with no internet access.", style = MaterialTheme.typography.bodySmall)
             Text(
                 "Built-in foods: USDA FoodData Central (U.S. Department of Agriculture, Agricultural Research Service), " +
-                    "public domain; and the ANSES-CIQUAL French food composition table (Anses), under the Licence Ouverte / " +
-                    "Etalab Open Licence 2.0. Carbs are shown without fibre, as on EU labels; values given as traces are shown as 0. " +
-                    "Neither source endorses this app.",
+                    "public domain" +
+                    (if (european) "; and the ANSES-CIQUAL French food composition table (Anses), under the Licence Ouverte / Etalab Open Licence 2.0" else "") +
+                    ". Carbs are shown without fibre, as on EU labels; values given as traces are shown as 0. " +
+                    "The sources don't endorse this app.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.testTag("credits"),
             )

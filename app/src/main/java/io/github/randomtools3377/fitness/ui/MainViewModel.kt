@@ -88,6 +88,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** The built-in foods, empty until the list has been read. */
     val builtIns = MutableStateFlow<List<Food>>(emptyList())
 
+    /** Whether the built-in list holds CIQUAL's European foods, for the credits. */
+    val hasEuropeanFoods: StateFlow<Boolean> = builtIns.map { list -> list.any { it.builtInId?.startsWith("C") == true } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     /** What is typed in the food search. */
     val query = MutableStateFlow("")
 

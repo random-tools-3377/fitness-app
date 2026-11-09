@@ -69,6 +69,7 @@ fun AddFoodScreen(
     val builtIns by vm.builtIns.collectAsState()
     val saved by vm.savedMeals.collectAsState()
     val units by vm.units.collectAsState()
+    val european by vm.hasEuropeanFoods.collectAsState()
     var picked by remember { mutableStateOf<Food?>(null) }
     var quick by remember { mutableStateOf(false) }
 
@@ -139,8 +140,9 @@ fun AddFoodScreen(
             }
             item {
                 Text(
-                    "Built-in foods: USDA FoodData Central (public domain) and CIQUAL, Anses (Licence Ouverte 2.0). " +
-                        "Carbs are shown without fibre, as on EU labels.",
+                    "Built-in foods: USDA FoodData Central (public domain)" +
+                        (if (european) " and CIQUAL, Anses (Licence Ouverte 2.0)" else "") +
+                        ". Carbs are shown without fibre, as on EU labels.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(16.dp),
                 )
