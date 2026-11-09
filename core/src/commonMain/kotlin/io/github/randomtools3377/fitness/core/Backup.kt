@@ -41,6 +41,12 @@ data class AppSettings(
     val theme: ThemeSettings = ThemeSettings(),
     /** Whether steps from Health Connect are read and counted (0.10.0). */
     val stepsOn: Boolean = false,
+    /** Calories by weekday and on training days (0.11.0). */
+    val dayTargets: DayTargets = DayTargets(),
+    /** A diet break at maintenance calories, if one is planned (0.11.0). */
+    val dietBreak: DietBreak? = null,
+    /** Grams of alcohol in a standard drink; null follows the phone's region (0.11.0). */
+    val drinkGrams: Double? = null,
     /** The Monday whose weekly check-in the user has seen and closed (0.8.0). */
     val checkInSeen: kotlinx.datetime.LocalDate? = null,
 ) {

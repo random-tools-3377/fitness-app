@@ -44,13 +44,15 @@ object Stats {
         targetKcal: Int?,
         water: List<WaterEntry>,
         workouts: List<Workout>,
+        /** The day's own target (0.11.0), when targets differ by day. */
+        targetFor: ((LocalDate) -> Int?)? = null,
     ): PeriodStats {
         val (from, to) = range(period, end)
         val inRange = entries.filter { it.day in from..to }
         val byDay = inRange.groupBy { it.day }.mapValues { (_, list) -> list.map { it.nutrients }.total() }.filterValues { it.kcal > 0 }
         val logged = byDay.size
         val avg = if (logged == 0) Nutrients.ZERO else byDay.values.total() * (1.0 / logged)
-        val onTarget = if (targetKcal == null) 0 else byDay.values.count { Streaks.onTarget(it.kcal, targetKcal) }
+        val onTarget = byDay.count { (d, n) -> (targetFor?.invoke(d) ?: targetKcal)?.let { Streaks.onTarget(n.kcal, it) } == true }
         val top = inRange.groupBy { it.name }.mapValues { (_, l) -> l.sumOf { it.nutrients.kcal } }
             .entries.sortedByDescending { it.value }.take(5).map { it.key to it.value }
         val waterDays = water.filter { it.day in from..to }.groupBy { it.day }.mapValues { (_, l) -> l.sumOf { it.ml } }

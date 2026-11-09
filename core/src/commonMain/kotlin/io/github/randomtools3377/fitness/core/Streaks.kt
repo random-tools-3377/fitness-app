@@ -82,9 +82,11 @@ object Streaks {
         workoutDays: List<LocalDate>,
         workoutsPerWeek: Int,
         today: LocalDate,
+        /** The day's own target (0.11.0), when targets differ by day; otherwise [targetKcal]. */
+        targetFor: ((LocalDate) -> Int?)? = null,
     ): AllStreaks = AllStreaks(
         foodLogged = days(dayKcal.filterValues { it > 0 }.keys, today),
-        onTarget = days(if (targetKcal == null) emptySet() else dayKcal.filter { onTarget(it.value, targetKcal) }.keys, today),
+        onTarget = days(dayKcal.filter { (d, k) -> (targetFor?.invoke(d) ?: targetKcal)?.let { onTarget(k, it) } == true }.keys, today),
         workoutWeeks = weeks(workoutDays, workoutsPerWeek, today),
         water = days(waterByDay.filter { it.value >= waterTargetMl }.keys, today),
     )

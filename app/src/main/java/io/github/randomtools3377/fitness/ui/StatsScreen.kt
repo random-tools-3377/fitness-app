@@ -71,6 +71,12 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
     val units: StateFlow<UnitSettings> = settings.map { it.units ?: UnitSettings.forRegion(Locale.getDefault().country) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, UnitSettings.forRegion(Locale.getDefault().country))
 
+    /** Each day's own target (0.11.0). */
+    fun targetFor(s: AppSettings, wo: List<Workout>): (LocalDate) -> Int? =
+        io.github.randomtools3377.fitness.core.DayTarget.resolver(
+            s, io.github.randomtools3377.fitness.core.Weight.latest(weighIns.value)?.kg, wo.filter { it.finished }.map { it.day }.toSet(), today().year,
+        )
+
     /** The four streaks, and finished fasts. */
     val streaks: StateFlow<Pair<AllStreaks, Streak>?> = combine(entries, water, workouts, settings, fasts) { e, w, wo, s, f ->
         val eaten = e.filter { !it.planned }
@@ -82,6 +88,7 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
             workoutDays = wo.filter { it.finished }.map { it.day },
             workoutsPerWeek = s.workoutsPerWeek,
             today = today(),
+            targetFor = targetFor(s, wo),
         )
         all to Streaks.days(io.github.randomtools3377.fitness.core.Fasting.finishedDays(f) { dayOfMillis(it) }, today())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -125,7 +132,7 @@ fun StatsScreen(svm: StatsViewModel, modifier: Modifier) {
     var period by rememberSaveable { mutableStateOf(StatsPeriod.WEEK) }
     val today = svm.today()
     val eaten = entries.filter { !it.planned }
-    val p = Stats.period(period, today, eaten, settings.targetKcal, water, workouts)
+    val p = Stats.period(period, today, eaten, settings.targetKcal, water, workouts, svm.targetFor(settings, workouts))
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("stats")) {
         Text("Stats", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))

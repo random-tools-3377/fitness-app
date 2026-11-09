@@ -81,7 +81,10 @@ class TodayWidget : AppWidgetProvider() {
                 val eaten = repo.entriesOnce(day).filter { !it.planned }.sumOf { it.nutrients.kcal }
                 val workouts = repo.workouts.first().filter { it.day == day && it.finished }
                 val burned = workouts.sumOf { it.burnedKcal } * (if (s.burnedHalf) 0.5 else 1.0) + repo.stepsKcal(day, s)
-                val target = s.targetKcal
+                val target = io.github.randomtools3377.fitness.core.DayTarget.resolver(
+                    s, io.github.randomtools3377.fitness.core.Weight.latest(repo.weighInsOnce())?.kg,
+                    repo.workouts.first().filter { it.finished }.map { it.day }.toSet(), day.year,
+                )(day)
                 if (target == null) {
                     views.setTextViewText(R.id.widget_kcal, Units.energy(eaten, units.energy))
                     views.setTextViewText(R.id.widget_detail, "eaten today")

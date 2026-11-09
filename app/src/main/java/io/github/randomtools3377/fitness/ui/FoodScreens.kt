@@ -95,6 +95,8 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
     var sugarText by remember { mutableStateOf("") }
     var satFatText by remember { mutableStateOf("") }
     var saltText by remember { mutableStateOf("") }
+    var alcoholText by remember { mutableStateOf("") }
+    var caffeineText by remember { mutableStateOf("") }
     var reading by remember { mutableStateOf<String?>(null) }
     val portions = remember { mutableStateListOf<PortionInput>() }
     var problems by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -114,6 +116,8 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
                 sugarText = f.per100.sugar?.let { formatAmount(it) }.orEmpty()
                 satFatText = f.per100.satFat?.let { formatAmount(it) }.orEmpty()
                 saltText = f.per100.salt?.let { formatAmount(it) }.orEmpty()
+                alcoholText = f.per100.micro(io.github.randomtools3377.fitness.core.Micro.ALCOHOL)?.let { formatAmount(it) }.orEmpty()
+                caffeineText = f.per100.micro(io.github.randomtools3377.fitness.core.Micro.CAFFEINE)?.let { formatAmount(it) }.orEmpty()
                 code = f.barcode
                 portions.clear()
                 f.portions.forEach { portions.add(PortionInput(it.label, formatAmount(it.amount))) }
@@ -133,6 +137,10 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
             sugar = Units.parse(sugarText),
             satFat = Units.parse(satFatText),
             salt = Units.parse(saltText),
+            micros = buildMap {
+                Units.parse(alcoholText)?.let { put(io.github.randomtools3377.fitness.core.Micro.ALCOHOL.key, it) }
+                Units.parse(caffeineText)?.let { put(io.github.randomtools3377.fitness.core.Micro.CAFFEINE.key, it) }
+            },
         )
         val out = mutableListOf<String>()
         if (energy == null) out += "Type the energy (calories) from the label."
@@ -274,6 +282,14 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
                 NumberField(saltText, { saltText = it }, "Salt", "field:salt", Modifier.weight(1f), suffix = "g")
             }
             Text("On a US label, salt is sodium (mg) × 2.5 ÷ 1000.", style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(alcoholText, { alcoholText = it }, "Alcohol", "field:alcohol", Modifier.weight(1f), suffix = "g")
+                NumberField(caffeineText, { caffeineText = it }, "Caffeine", "field:caffeine", Modifier.weight(1f), suffix = "mg")
+            }
+            Text(
+                "For drinks: alcohol in grams (a drink of 5% is about 4 g per 100 ml), and caffeine in mg, for the same amount as the numbers above.",
+                style = MaterialTheme.typography.bodySmall,
+            )
 
             Text("Its own portions (optional), like \"1 slice\" of 30 g", style = MaterialTheme.typography.labelLarge)
             portions.forEachIndexed { i, p ->

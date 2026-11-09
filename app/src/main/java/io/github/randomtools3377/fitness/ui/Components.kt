@@ -113,6 +113,8 @@ fun extrasLine(n: Nutrients): String = listOfNotNull(
     n.sugar?.let { "Sugar ${io.github.randomtools3377.fitness.core.formatAmount(Math.round(it * 10) / 10.0)} g" },
     n.satFat?.let { "Saturates ${io.github.randomtools3377.fitness.core.formatAmount(Math.round(it * 10) / 10.0)} g" },
     n.salt?.let { "Salt ${io.github.randomtools3377.fitness.core.formatAmount(Math.round(it * 100) / 100.0)} g" },
+    n.micro(io.github.randomtools3377.fitness.core.Micro.ALCOHOL)?.takeIf { it > 0 }?.let { "Alcohol ${io.github.randomtools3377.fitness.core.formatAmount(Math.round(it * 10) / 10.0)} g" },
+    n.micro(io.github.randomtools3377.fitness.core.Micro.CAFFEINE)?.takeIf { it > 0 }?.let { "Caffeine ${Math.round(it)} mg" },
 ).joinToString(" · ")
 
 fun energy(kcal: Double, u: UnitSettings): String = Units.energy(kcal, u.energy)

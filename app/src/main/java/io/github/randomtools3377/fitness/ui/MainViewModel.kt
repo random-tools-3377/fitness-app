@@ -98,6 +98,43 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setBurnedHalf(half: Boolean) = launchSafely { repo.updateSettings { it.copy(burnedHalf = half) } }
 
+    private val noTargets: (LocalDate) -> Int? = { null }
+
+    /** Each day's calorie target: by weekday, on training days, and in a diet break (0.11.0). */
+    val targetFor: StateFlow<(LocalDate) -> Int?> = combine(settings, repo.weighIns, repo.workouts) { s, w, wo ->
+        io.github.randomtools3377.fitness.core.DayTarget.resolver(
+            s, io.github.randomtools3377.fitness.core.Weight.latest(w)?.kg, wo.filter { it.finished }.map { it.day }.toSet(), today().year,
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, noTargets)
+
+    /** Why the shown day's target differs from the usual one, if it does. */
+    val dayTargetWhy: StateFlow<String?> = combine(day, settings, repo.weighIns, repo.workouts) { d, s, w, wo ->
+        io.github.randomtools3377.fitness.core.DayTarget.whyFor(
+            s, io.github.randomtools3377.fitness.core.Weight.latest(w)?.kg, wo.filter { it.finished }.map { it.day }.toSet(), today().year, d,
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun setDayTargets(t: io.github.randomtools3377.fitness.core.DayTargets) = launchSafely {
+        t.weekdayKcal.values.forEach { require(it in 800..10000) { "A day's target is between 800 and 10,000 kcal." } }
+        t.trainingExtraKcal?.let { require(it in -1000..3000) { "The training-day extra is up to 3,000 kcal." } }
+        repo.updateSettings { it.copy(dayTargets = t) }
+        message.value = "Saved"
+    }
+
+    fun startDietBreak(weeks: Int) = launchSafely {
+        val s = settings.value
+        require(s.profile != null) { "Fill in your details under the daily target first, so maintenance can be worked out." }
+        repo.updateSettings { it.copy(dietBreak = io.github.randomtools3377.fitness.core.DietBreak(today(), weeks)) }
+        message.value = "Diet break started"
+    }
+
+    fun endDietBreak() = launchSafely { repo.updateSettings { it.copy(dietBreak = null) } }
+
+    fun setDrinkGrams(g: Double?) = launchSafely {
+        g?.let { require(it in 1.0..50.0) { "A standard drink is between 1 and 50 g of alcohol." } }
+        repo.updateSettings { it.copy(drinkGrams = g) }
+    }
+
     /** The day's steps and the calories they add (0.10.0), read from Health Connect when steps are on. */
     val daySteps = MutableStateFlow<Long?>(null)
     val dayStepsKcal = MutableStateFlow(0.0)

@@ -18,22 +18,28 @@ data class Nutrients(
     val sugar: Double? = null,
     val satFat: Double? = null,
     val salt: Double? = null,
+    /** Alcohol, caffeine, and vitamins and minerals, by [Micro.key] (0.11.0); a missing key is not known. */
+    val micros: Map<String, Double> = emptyMap(),
 ) {
     operator fun plus(other: Nutrients) = Nutrients(
         kcal + other.kcal, protein + other.protein, carbs + other.carbs, fat + other.fat,
         add(fibre, other.fibre), add(sugar, other.sugar), add(satFat, other.satFat), add(salt, other.salt),
+        Micros.add(micros, other.micros),
     )
 
     operator fun times(factor: Double) = Nutrients(
         kcal * factor, protein * factor, carbs * factor, fat * factor,
         fibre?.times(factor), sugar?.times(factor), satFat?.times(factor), salt?.times(factor),
+        Micros.times(micros, factor),
     )
+
+    fun micro(m: Micro): Double? = micros[m.key]
 
     /** Whether any of fibre, sugar, saturated fat or salt is known. */
     val hasExtras: Boolean get() = fibre != null || sugar != null || satFat != null || salt != null
 
     /** The same calories, protein, carbs and fat, with the extras taken from [other]. */
-    fun withExtras(other: Nutrients) = copy(fibre = other.fibre, sugar = other.sugar, satFat = other.satFat, salt = other.salt)
+    fun withExtras(other: Nutrients) = copy(fibre = other.fibre, sugar = other.sugar, satFat = other.satFat, salt = other.salt, micros = other.micros)
 
     companion object {
         val ZERO = Nutrients()

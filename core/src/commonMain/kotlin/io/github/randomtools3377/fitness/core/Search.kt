@@ -118,6 +118,7 @@ object BuiltInFoods {
                 per100 = Nutrients(
                     f[2].toDouble(), f[3].toDouble(), f[4].toDouble(), f[5].toDouble(),
                     fibre = opt(f, 7), sugar = opt(f, 8), satFat = opt(f, 9), salt = opt(f, 10),
+                    micros = Micros.fromColumns(f, 11),
                 ),
                 portions = portions,
             )
