@@ -1,0 +1,11 @@
+The built-in food list (foods.tsv) comes from USDA FoodData Central, the food data of the
+U.S. Department of Agriculture, Agricultural Research Service (https://fdc.nal.usda.gov).
+FoodData Central is in the public domain (CC0 1.0). The datasets used are:
+
+  - Foundation Foods: FoodData_Central_foundation_food_json_2026-10-29.zip (373 foods)
+  - SR Legacy: FoodData_Central_sr_legacy_food_json_2018-04.zip (7703 foods)
+  - FNDDS (Survey Foods): FoodData_Central_survey_food_json_2024-10-31.zip (5326 foods)
+
+U.S. Department of Agriculture, Agricultural Research Service. FoodData Central.
+Nutrients are per 100 g as published. Where a name appears in more than one dataset, only the
+first is kept, in the order above. This app is not endorsed by the USDA.
