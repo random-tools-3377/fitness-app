@@ -1,0 +1,46 @@
+name: Food list
+
+# Builds the built-in food list from USDA FoodData Central with tools/build-food-list.py and
+# pushes the result to the "food-data" branch, to be checked and merged into main by hand.
+# Runs when the script changes on main, or when started from the Actions tab. It uses no
+# secrets and never runs code from a pull request.
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/build-food-list.py"
+      - ".github/workflows/food-data.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the food list
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build foods.tsv from USDA FoodData Central
+        run: python3 tools/build-food-list.py --work "$RUNNER_TEMP/usda" --out app/src/main/assets
+
+      - name: Show a sample
+        run: |
+          head -n 6 app/src/main/assets/foods.tsv
+          grep -c -v '^#' app/src/main/assets/foods.tsv
+          grep -i -m 5 $'\tBanana' app/src/main/assets/foods.tsv || true
+          grep -i -m 5 'egg, whole, raw' app/src/main/assets/foods.tsv || true
+          ls -l app/src/main/assets
+
+      - name: Push it to the food-data branch
+        run: |
+          git config user.name "Claude"
+          git config user.email "noreply@anthropic.com"
+          git checkout -B food-data
+          git add app/src/main/assets/foods.tsv app/src/main/assets/foods-NOTICE.txt
+          git commit -m "Built-in food list from USDA FoodData Central" -m "Made by tools/build-food-list.py in the Food list workflow."
+          git push --force origin food-data
