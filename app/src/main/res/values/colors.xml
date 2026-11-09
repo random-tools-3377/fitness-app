@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#B5462F</color>
+    <!-- The other home-screen icons (0.17.0). -->
+    <color name="ic_launcher_ocean_background">#2F80C0</color>
+    <color name="ic_launcher_forest_background">#3E7B3A</color>
+    <color name="ic_launcher_night_background">#1D1B1A</color>
     <!-- The home-screen widget (0.10.0). -->
     <color name="widget_background">#F2FFF8F6</color>
     <color name="widget_text">#FF231918</color>

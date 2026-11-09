@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The see-through widget (0.17.0): a dark film over the wallpaper, for white text. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#61000000" />
+    <corners android:radius="20dp" />
+</shape>

@@ -77,8 +77,9 @@ fun <T> Choices(options: List<T>, selected: T, label: (T) -> String, tag: (T) ->
 
 @Composable
 fun Section(title: String? = null, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Card(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val spacing = LocalCardSpacing.current
+    Card(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = spacing.gap * 0.75f)) {
+        Column(Modifier.padding(spacing.padding), verticalArrangement = Arrangement.spacedBy(spacing.gap)) {
             if (title != null) Text(title, style = MaterialTheme.typography.titleMedium)
             content()
         }
