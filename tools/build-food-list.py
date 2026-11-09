@@ -29,9 +29,10 @@ and the FoodData Central id, or C and the CIQUAL code. Portions are "label=grams
 by "|", for example "1 cup, chopped=128|1 tbsp=8" (CIQUAL has none). Lines starting with "#" are
 comments.
 
-The USDA download page is read to find the newest file of each dataset, and data.gouv.fr's
-catalogue to find the newest CIQUAL XML file. If one can't be read, the newest known file names
-are tried. Any file can be given with --foundation, --sr, --fndds or --ciqual.
+The USDA download page is read to find the newest file of each dataset, and the data.gouv.fr and
+data.europa.eu catalogues to find the newest CIQUAL XML file. If one can't be read, the newest
+known file names are tried. If the CIQUAL site itself is down, the Internet Archive's saved copy
+of the same official file is tried last. Any file can be given with --foundation, --sr, --fndds or --ciqual.
 """
 import argparse
 import io
@@ -91,6 +92,10 @@ CIQUAL_DATASET_API = "https://www.data.gouv.fr/api/1/datasets/table-de-compositi
 CIQUAL_KNOWN = [
     "https://ciqual.anses.fr/cms/sites/default/files/inline-files/XML_2020_07_07.zip",
 ]
+# The same dataset in the EU's open data portal, which lists its files too.
+CIQUAL_EUROPA_API = "https://data.europa.eu/api/hub/search/datasets/5369a15fa3a729239d2065b7"
+# The Internet Archive's saved copy of a file, byte for byte as it was served.
+WAYBACK = "https://web.archive.org/web/2024id_/"
 CIQUAL_LETTER = "C"
 CIQUAL_TITLE = "CIQUAL (France)"
 
@@ -329,11 +334,45 @@ def ciqual_candidates():
                 text = (title + " " + url + " " + fmt).lower()
                 if "xml" in text and url.lower().endswith(".zip"):
                     found.append((r.get("last_modified") or "", url))
+    found += ciqual_europa()
     urls = [u for _, u in sorted(set(found), reverse=True)]
     for u in CIQUAL_KNOWN:
         if u not in urls:
             urls.append(u)
-    return urls
+    return urls + [WAYBACK + u for u in urls if not u.startswith(WAYBACK)]
+
+
+def ciqual_europa():
+    """The CIQUAL XML zips listed on data.europa.eu, as (date, address) pairs."""
+    try:
+        info = json.loads(fetch(CIQUAL_EUROPA_API, tries=2).decode("utf-8"))
+    except Exception as e:
+        print("Could not read", CIQUAL_EUROPA_API, ":", e)
+        return []
+    d = info.get("result", info)
+
+    def text(x):
+        if isinstance(x, dict):
+            return " ".join(str(v) for v in x.values())
+        if isinstance(x, list):
+            return " ".join(text(v) for v in x)
+        return str(x or "")
+
+    found = []
+    for r in d.get("distributions", []) or []:
+        title = text(r.get("title"))
+        fmt = text(r.get("format"))
+        urls = []
+        for key in ("download_url", "access_url"):
+            v = r.get(key) or []
+            urls += v if isinstance(v, list) else [v]
+        for url in urls:
+            if not isinstance(url, str):
+                continue
+            print("  CIQUAL on data.europa.eu: %s | %s | %s | %s" % (title, fmt, r.get("modified"), url))
+            if "xml" in (title + " " + url + " " + fmt).lower() and url.lower().endswith(".zip"):
+                found.append((str(r.get("modified") or ""), url))
+    return found
 
 
 def ciqual_file(given, work):
@@ -344,11 +383,18 @@ def ciqual_file(given, work):
     if local:
         return os.path.join(work, local[-1])
     urls = [given] if given else ciqual_candidates()
-    for url in urls:
+    for i, url in enumerate(urls):
+        path = os.path.join(work, "ciqual-%d-%s" % (i, os.path.basename(url)))
         try:
-            return download(url, os.path.join(work, "ciqual-" + os.path.basename(url)))
+            download(url, path)
         except Exception as e:
             print("  Could not download", url, ":", e)
+            continue
+        if zipfile.is_zipfile(path):
+            print("CIQUAL file from", url)
+            return path
+        print("  Not a zip file:", url)
+        os.remove(path)
     return None
 
 
@@ -443,7 +489,7 @@ def build_ciqual(args, work):
             number(v.get(fat[0]) or 0.0),
             "",
         ])
-    name = os.path.basename(path)
+    name = re.sub(r"^ciqual-(\d+-)?", "", os.path.basename(path))
     print("%s (%s): %d foods, %d kept" % (CIQUAL_TITLE, name, len(alim), len(rows)))
     return rows, [(CIQUAL_TITLE, name, len(rows))]
 
