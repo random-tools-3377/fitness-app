@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
 import com.googlecode.tesseract.android.TessBaseAPI
+import io.github.randomtools3377.fitness.ai.BetterLabelReader
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,9 +34,19 @@ object LabelOcr {
         File(context.cacheDir, "labels").listFiles()?.forEach { it.delete() }
     }
 
-    /** The text on the photo at [uri], or "" if none could be read. */
-    suspend fun read(context: Context, uri: Uri): String = withContext(Dispatchers.Default) {
+    /**
+     * The text on the photo at [uri], or "" if none could be read. With [better], and its model
+     * file opened, the optional PaddleOCR models read it (0.16.0); if they fail, Tesseract does.
+     */
+    suspend fun read(context: Context, uri: Uri, better: Boolean = false): String = withContext(Dispatchers.Default) {
         val bitmap = load(context, uri) ?: return@withContext ""
+        if (better && BetterLabelReader.available(context)) {
+            val text = runCatching { BetterLabelReader.read(context, bitmap) }.getOrDefault("")
+            if (text.isNotBlank()) {
+                bitmap.recycle()
+                return@withContext text
+            }
+        }
         val dataDir = prepare(context)
         val api = TessBaseAPI()
         try {

@@ -22,4 +22,20 @@ class FeaturesTest {
         assertFalse(Feature.CYCLE in on)
         assertEquals(on, Features.enabled(s.copy(features = Features.encode(on))))
     }
+
+    @Test
+    fun betterLabelReadingBringsLabelReadingWithIt() {
+        val on = Features.switch(Features.STARTS_ON, Feature.AI_LABELS, true)
+        assertTrue(Feature.LABEL_PHOTO in on && Feature.AI_LABELS in on)
+        val off = Features.switch(on, Feature.LABEL_PHOTO, false)
+        assertTrue(Feature.LABEL_PHOTO !in off && Feature.AI_LABELS !in off)
+    }
+
+    @Test
+    fun aiPartsStartOffAndAreMarked() {
+        val ai = Feature.entries.filter { it.ai }
+        assertTrue(ai.isNotEmpty())
+        assertTrue(ai.none { it in Features.STARTS_ON })
+        assertTrue(ai.none { it in Features.firstChoice(AppSettings(), FeatureUse(hasWorkouts = true)) })
+    }
 }

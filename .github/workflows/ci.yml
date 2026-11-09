@@ -40,7 +40,12 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      - name: Get the label-reading models, to test reading a label with them
+        run: tools/build-ai-labels.sh "$RUNNER_TEMP/ai"
+
       - name: Unit tests (the shared rules, on the JVM)
+        env:
+          FITNESS_AI_MODELS: ${{ runner.temp }}/ai/labels
         run: ./gradlew --no-daemon :core:jvmTest :app:testDebugUnitTest
 
       - name: Build the release APK, unsigned

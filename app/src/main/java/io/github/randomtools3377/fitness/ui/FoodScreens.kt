@@ -165,10 +165,11 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
     }
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    val better = on(io.github.randomtools3377.fitness.core.Feature.AI_LABELS)
     fun readLabel(uri: android.net.Uri) {
         reading = "Reading the label…"
         scope.launch {
-            val text = runCatching { LabelOcr.read(context, uri) }.getOrDefault("")
+            val text = runCatching { LabelOcr.read(context, uri, better) }.getOrDefault("")
             LabelOcr.clear(context)
             val r = LabelText.read(text)
             if (r == null) {

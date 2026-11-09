@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -475,12 +476,52 @@ fun FeaturesScreen(vm: MainViewModel, modifier: Modifier, back: () -> Unit) {
                     modifier = Modifier.padding(16.dp),
                 )
             }
-            val inUse = io.github.randomtools3377.fitness.core.Feature.entries.filter { it in features }
-            val suggestions = io.github.randomtools3377.fitness.core.Feature.entries.filter { it !in features }
+            val inUse = io.github.randomtools3377.fitness.core.Feature.entries.filter { !it.ai && it in features }
+            val suggestions = io.github.randomtools3377.fitness.core.Feature.entries.filter { !it.ai && it !in features }
             if (inUse.isNotEmpty()) item { Text("On", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 8.dp)) }
             for (f in inUse) item(key = "on:${f.name}") { FeatureRow(f, true) { vm.setFeature(f, it) } }
             if (suggestions.isNotEmpty()) item { Text("You might like", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 16.dp)) }
             for (f in suggestions) item(key = "off:${f.name}") { FeatureRow(f, false) { vm.setFeature(f, it) } }
+            item { AiSection(vm, features) }
+        }
+    }
+}
+
+/** The optional on-phone AI parts (0.16.0), apart from the rest: each is off until switched on, and needs its model file. */
+@Composable
+private fun AiSection(vm: MainViewModel, features: Set<io.github.randomtools3377.fitness.core.Feature>) {
+    val installed by vm.aiInstalled.collectAsState()
+    val installing by vm.aiInstalling.collectAsState()
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.installAi(uri) }
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp).testTag("ai-section")) {
+        Text("AI on this phone", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp))
+        Text(
+            "Optional. Everything else works without these. They run only on the phone, with no internet, " +
+                "and only suggest: you check everything before it's saved.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        for (f in io.github.randomtools3377.fitness.core.Feature.entries.filter { it.ai }) {
+            val isOn = f in features
+            FeatureRow(f, isOn) { vm.setFeature(f, it) }
+            if (isOn && f == io.github.randomtools3377.fitness.core.Feature.AI_LABELS) {
+                val id = "labels"
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (id in installed) {
+                        Text("The model file is on the phone. Label photos now use it.", style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick = { vm.removeAi(id) }, modifier = Modifier.testTag("ai-remove:$id")) { Text("Remove the model file") }
+                    } else {
+                        Text(
+                            "One more step: on the phone, open the app's Releases page, find \"AI models\", and download " +
+                                "${io.github.randomtools3377.fitness.ai.AiModels.fileName(id)}. Then open it here. Until then, labels are read the usual way.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Button(onClick = { pick.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }, enabled = !installing, modifier = Modifier.testTag("ai-open:$id")) {
+                            Text(if (installing) "Opening…" else "Open the model file")
+                        }
+                    }
+                }
+            }
         }
     }
 }

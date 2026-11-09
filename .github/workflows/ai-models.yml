@@ -1,0 +1,35 @@
+name: AI models
+
+# Builds the optional on-phone AI model files with tools/build-ai-*.sh and publishes them on the
+# "ai-models" Release, which is never marked as the latest app version. Started from the Actions
+# tab. Uses no signing secrets and never runs pull request code.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-models
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and publish the AI model files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the label-reading file
+        run: tools/build-ai-labels.sh "$RUNNER_TEMP/ai"
+
+      - name: Publish on the "ai-models" Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ runner.temp }}/ai
+        run: scripts/publish-ai-models.sh "$OUT"
