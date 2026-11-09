@@ -379,6 +379,22 @@ Decided on 2026-11-09: AI features are added, on these terms.
   - Build order: 0.16.0 better label reading; 0.17.0 describing a meal, pasting a recipe and the
     weekly summary; 0.18.0 voice; 0.19.0 plate photos.
 
+## The look, like the checklist app
+
+Decided on 2026-11-09: the appearance choices the checklist app has are added here too (copied,
+not shared), where they fit a fitness app.
+
+- Colours: pure black as well as light, dark and follow the phone; ready-made colour themes; any
+  colour from a colour picker, with the whole theme built from it so text stays readable.
+- Sizes and fonts: card size as well as text size, and a few bundled fonts.
+- Tabs and background: choosing and ordering the tabs and the one the app opens on, and a
+  gradient or the user's own photo, dimmed, behind the diary.
+- Icon and widget: app icon choices, and the widget solid in the app's colours or see-through.
+- **Details (default):** the same choices as the checklist app: themes Ocean, Forest and
+  Sunset; a colour square, hue slider and hex box; the fonts Nunito, Atkinson Hyperlegible and
+  Lora (SIL Open Font License, credited in the app). The background photo stays in the app's own
+  storage and out of the backup file, like progress photos. All in Settings → Look, as 0.17.0.
+
 ## Talking to the owner
 
 - Short and plain. The owner is not an Android developer. Say what changed, what to try, and what
