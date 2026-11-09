@@ -219,3 +219,50 @@ fun WorkoutsPerWeekRow(vm: MainViewModel, settings: AppSettings) {
         Choices((1..7).toList(), settings.workoutsPerWeek, { "$it" }, { "per-week:$it" }) { vm.setWorkoutsPerWeek(it) }
     }
 }
+
+/** A target for each meal: off until turned on, the day's target split between the meals. */
+@Composable
+fun MealSplitSection(vm: MainViewModel, settings: AppSettings) {
+    val current = settings.mealSplit
+    var on by remember(current) { mutableStateOf(current.enabled) }
+    var mode by remember(current) { mutableStateOf(current.mode) }
+    val texts = remember(current) { Meal.entries.associateWith { mutableStateOf(io.github.randomtools3377.fitness.core.formatAmount(current.shares[it] ?: 0.0)) } }
+    val day = settings.targetKcal
+    fun typed() = io.github.randomtools3377.fitness.core.MealSplit(
+        on, mode, Meal.entries.associateWith { io.github.randomtools3377.fitness.core.Units.parse(texts.getValue(it).value) ?: -1.0 },
+    )
+    Section("A target for each meal") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Split the day's target between meals", Modifier.weight(1f))
+            Switch(checked = on, onCheckedChange = { on = it; if (!it) vm.setMealSplit(current.copy(enabled = false)) }, modifier = Modifier.testTag("meal-split-on"))
+        }
+        if (on) {
+            if (day == null) Text("Set a daily calorie target first.", style = MaterialTheme.typography.bodySmall)
+            Choices(
+                io.github.randomtools3377.fitness.core.MacroMode.entries, mode,
+                { if (it == io.github.randomtools3377.fitness.core.MacroMode.PERCENT) "Percent" else "Calories" }, { "split-mode:${it.name}" },
+            ) { new ->
+                // Keep the same split when switching between percent and calories.
+                if (day != null && day > 0) {
+                    for (m in Meal.entries) {
+                        val x = io.github.randomtools3377.fitness.core.Units.parse(texts.getValue(m).value) ?: continue
+                        texts.getValue(m).value = io.github.randomtools3377.fitness.core.formatAmount(
+                            Math.round(if (new == io.github.randomtools3377.fitness.core.MacroMode.GRAMS) x * day / 100.0 else x * 100.0 / day).toDouble(),
+                        )
+                    }
+                }
+                mode = new
+            }
+            for (m in Meal.entries) {
+                NumberField(
+                    texts.getValue(m).value, { texts.getValue(m).value = it }, m.title, "field:split:${m.name}", Modifier,
+                    suffix = if (mode == io.github.randomtools3377.fitness.core.MacroMode.PERCENT) "%" else "kcal",
+                )
+            }
+            val problem = typed().problem(day ?: 0)
+            problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Text("Protein, carbs and fat follow the same split. Going over in one meal doesn't take from the others.", style = MaterialTheme.typography.bodySmall)
+            androidx.compose.material3.Button(onClick = { vm.setMealSplit(typed()) }, enabled = problem == null && day != null, modifier = Modifier.testTag("save-meal-split")) { Text("Save") }
+        }
+    }
+}

@@ -66,12 +66,13 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
     val water: StateFlow<List<WaterEntry>> = repo.allWater.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val workouts: StateFlow<List<Workout>> = repo.workouts.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val weighIns: StateFlow<List<WeighIn>> = repo.weighIns.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val fasts: StateFlow<List<io.github.randomtools3377.fitness.core.Fast>> = repo.fasts.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val settings: StateFlow<AppSettings> = repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
     val units: StateFlow<UnitSettings> = settings.map { it.units ?: UnitSettings.forRegion(Locale.getDefault().country) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, UnitSettings.forRegion(Locale.getDefault().country))
 
     /** The four streaks, and finished fasts. */
-    val streaks: StateFlow<Pair<AllStreaks, Streak>?> = combine(entries, water, workouts, settings) { e, w, wo, s ->
+    val streaks: StateFlow<Pair<AllStreaks, Streak>?> = combine(entries, water, workouts, settings, fasts) { e, w, wo, s, f ->
         val eaten = e.filter { !it.planned }
         val all = Streaks.all(
             dayKcal = eaten.groupBy { it.day }.mapValues { (_, l) -> l.sumOf { it.nutrients.kcal } },
@@ -82,7 +83,7 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
             workoutsPerWeek = s.workoutsPerWeek,
             today = today(),
         )
-        all to Streak(0, 0)
+        all to Streaks.days(io.github.randomtools3377.fitness.core.Fasting.finishedDays(f) { dayOfMillis(it) }, today())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 }
 

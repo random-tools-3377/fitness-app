@@ -101,6 +101,7 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel) {
         when (fromReminder ?: return@LaunchedEffect) {
             "WORKOUT" -> tab = Tab.WORKOUTS
             "WEIGH_IN" -> { tab = Tab.PROGRESS; progressPart = "weight" }
+            "FAST" -> { tab = Tab.PLAN; vm.planPart.value = "fasting" }
             else -> tab = Tab.DIARY
         }
         vm.openFromReminder.value = null
@@ -192,6 +193,17 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel) {
             Route.ActiveWorkout -> ActiveWorkoutScreen(wvm, modifier, back = ::back)
             Route.Bests -> BestsScreen(wvm, modifier, back = ::back)
         }
+    }
+
+    val askEndFast by vm.askEndFast.collectAsState()
+    if (askEndFast) {
+        AlertDialog(
+            onDismissRequest = { vm.askEndFast.value = false },
+            title = { Text("You're fasting") },
+            text = { Text("You've just logged food. End the fast now?") },
+            confirmButton = { TextButton(onClick = { vm.endFast() }, modifier = Modifier.testTag("confirm-end-fast")) { Text("End it") } },
+            dismissButton = { TextButton(onClick = { vm.askEndFast.value = false }) { Text("Keep fasting") } },
+        )
     }
 
     offer?.let { o ->

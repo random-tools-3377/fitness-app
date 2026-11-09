@@ -20,6 +20,7 @@ import io.github.randomtools3377.fitness.core.CardioType
 import io.github.randomtools3377.fitness.core.Exercise
 import io.github.randomtools3377.fitness.core.ExerciseKind
 import io.github.randomtools3377.fitness.core.Exercises
+import io.github.randomtools3377.fitness.core.Fast
 import io.github.randomtools3377.fitness.core.Recipe
 import io.github.randomtools3377.fitness.core.RecipeText
 import io.github.randomtools3377.fitness.core.SavedWorkout
@@ -101,6 +102,15 @@ data class ShoppingRow(
     val unit: String,
     val ticked: Boolean,
     val own: Boolean,
+)
+
+/** A fast (0.6.0): when it started, how long it was meant to be, when it ended. */
+@Entity(tableName = "fasts")
+data class FastRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val startedAt: Long,
+    val plannedHours: Double,
+    val endedAt: Long?,
 )
 
 @Entity(tableName = "saved_meals")
@@ -407,6 +417,21 @@ interface FitnessDao {
     @Query("DELETE FROM shopping_items WHERE own = 0 OR ticked = 1")
     suspend fun clearMadeAndTicked()
 
+    // Fasting (0.6.0).
+    @Query("SELECT * FROM fasts ORDER BY startedAt")
+    fun fasts(): Flow<List<FastRow>>
+
+    @Query("SELECT * FROM fasts ORDER BY startedAt")
+    suspend fun allFasts(): List<FastRow>
+
+    @Upsert
+    suspend fun putFast(row: FastRow): Long
+
+    @Query("DELETE FROM fasts WHERE id = :id")
+    suspend fun deleteFast(id: Long)
+
+    @Query("DELETE FROM fasts") suspend fun clearFasts()
+
     @Query("DELETE FROM recipes") suspend fun clearRecipes()
     @Query("DELETE FROM shopping_items") suspend fun clearShopping()
 
@@ -509,10 +534,12 @@ interface FitnessDao {
         ProductRow::class, CountryRow::class,
         // Version 4 (0.5.0): planning ahead, recipes and the shopping list.
         RecipeRow::class, ShoppingRow::class,
+        // Version 5 (0.6.0): fasting.
+        FastRow::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
@@ -632,3 +659,6 @@ fun RecipeRow.toCore() = Recipe(id, name, servings, RecipeText.decode(items), co
 fun Recipe.toRow() = RecipeRow(id, name, servings, RecipeText.encode(items), cookedGrams, notes, createdAt)
 fun ShoppingRow.toCore() = ShoppingItem(id, name, grams, BaseUnit.valueOf(unit), ticked, own)
 fun ShoppingItem.toRow() = ShoppingRow(id, name, grams, unit.name, ticked, own)
+
+fun FastRow.toCore() = Fast(id, startedAt, plannedHours, endedAt)
+fun Fast.toRow() = FastRow(id, startedAt, plannedHours, endedAt)

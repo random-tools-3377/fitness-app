@@ -158,8 +158,11 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
 
         for (meal in Meal.entries) {
             item(key = meal.name) {
+                val mealTargets = if (settings.mealSplit.enabled && settings.targetKcal != null)
+                    settings.mealSplit.targets(settings.macros.grams(settings.targetKcal!!)) else null
                 MealCard(
                     meal = meal,
+                    target = mealTargets?.get(meal),
                     entries = entries.filter { it.meal == meal },
                     total = totals.byMeal.getValue(meal),
                     units = units,
@@ -237,6 +240,7 @@ private fun MacroRow(name: String, eaten: Double, target: Double?) {
 @Composable
 private fun MealCard(
     meal: Meal,
+    target: Nutrients?,
     entries: List<DiaryEntry>,
     total: Nutrients,
     units: UnitSettings,
@@ -256,6 +260,16 @@ private fun MealCard(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.testTag("meal-kcal:${meal.name}"),
                 )
+                if (target != null) {
+                    // Each meal's own share; going over here doesn't take from the others.
+                    val left = target.kcal - total.kcal
+                    Text(
+                        (if (left >= 0) "${energy(left, units)} left of " else "${energy(-left, units)} over ") + energy(target.kcal, units),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (left >= 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag("meal-left:${meal.name}"),
+                    )
+                }
             }
             IconButton(onClick = add, modifier = Modifier.testTag("add:${meal.name}")) {
                 Icon(Icons.Filled.Add, contentDescription = "Add to ${meal.title}")

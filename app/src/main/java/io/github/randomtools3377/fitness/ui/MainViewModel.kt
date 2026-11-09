@@ -178,6 +178,49 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // 0.6.0: meal targets and fasting.
+
+    val fasts: StateFlow<List<io.github.randomtools3377.fitness.core.Fast>> = repo.fasts.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** The fast going on now, if any. */
+    val activeFast: StateFlow<io.github.randomtools3377.fitness.core.Fast?> = fasts.map { list -> list.lastOrNull { it.endedAt == null } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Which part of the Plan tab shows: meals, shopping, recipes or fasting. */
+    val planPart = MutableStateFlow("meals")
+
+    /** Set when food is logged during a fast, to ask whether to end it. */
+    val askEndFast = MutableStateFlow(false)
+
+    fun startFast(hours: Double) = launchSafely {
+        require(hours in 1.0..72.0) { "Choose between 1 and 72 hours." }
+        if (activeFast.value != null) return@launchSafely
+        val f = io.github.randomtools3377.fitness.core.Fast(startedAt = now(), plannedHours = hours)
+        repo.saveFast(f)
+        repo.updateSettings { it.copy(fastHours = hours) }
+        io.github.randomtools3377.fitness.fasting.FastAlarm.set(getApplication(), f.endsAt())
+        message.value = "Fast started"
+    }
+
+    fun endFast() = launchSafely {
+        val f = activeFast.value ?: return@launchSafely
+        val ended = f.copy(endedAt = now())
+        repo.saveFast(ended)
+        io.github.randomtools3377.fitness.fasting.FastAlarm.cancel(getApplication())
+        askEndFast.value = false
+        message.value = if (ended.finished) "Fast finished: well done" else "Fast ended"
+    }
+
+    fun deleteFast(f: io.github.randomtools3377.fitness.core.Fast) = launchSafely { repo.deleteFast(f.id) }
+
+    private fun checkFast() { if (activeFast.value != null) askEndFast.value = true }
+
+    fun setMealSplit(m: io.github.randomtools3377.fitness.core.MealSplit) = launchSafely {
+        if (m.enabled) m.problem(settings.value.targetKcal ?: 0)?.let { throw IllegalArgumentException(it) }
+        repo.updateSettings { it.copy(mealSplit = m) }
+        message.value = "Saved"
+    }
+
     // 0.5.0: planning ahead, recipes and the shopping list.
 
     /** The first day the plan shows (a week from it). Tomorrow to start. */
@@ -210,6 +253,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun eatPlanned(e: DiaryEntry) = launchSafely {
         repo.updateEntry(io.github.randomtools3377.fitness.core.Plan.eat(e, now()))
         message.value = "Logged ${e.name}"
+        checkFast()
     }
 
     /** Copies the planned items of [from] (one day, or the week from it) [days] days later. */
@@ -329,11 +373,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun log(food: Food, amount: Amount, meal: Meal) = launchSafely {
         repo.addEntries(listOf(Diary.entry(food, amount, day.value, meal, now())))
         message.value = "Added ${food.name} to ${meal.title.lowercase()}"
+        checkFast()
     }
 
     fun quickAdd(kcal: Double, name: String, meal: Meal) = launchSafely {
         repo.addEntries(listOf(Diary.quickAdd(kcal, day.value, meal, now(), name)))
         message.value = "Added to ${meal.title.lowercase()}"
+        checkFast()
     }
 
     suspend fun foodOf(entry: DiaryEntry): Food? = repo.foodOf(entry)
@@ -375,6 +421,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun logSavedMeal(saved: SavedMeal, meal: Meal) = launchSafely {
         repo.addEntries(saved.toEntries(day.value, meal, now()))
         message.value = "Added ${saved.name} to ${meal.title.lowercase()}"
+        checkFast()
     }
 
     fun renameSavedMeal(saved: SavedMeal, name: String) = launchSafely {

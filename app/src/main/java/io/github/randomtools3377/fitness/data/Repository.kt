@@ -12,6 +12,7 @@ import io.github.randomtools3377.fitness.core.Exercises
 import io.github.randomtools3377.fitness.core.SavedWorkout
 import io.github.randomtools3377.fitness.core.Workout
 import io.github.randomtools3377.fitness.core.Food
+import io.github.randomtools3377.fitness.core.Fast
 import io.github.randomtools3377.fitness.core.Plan
 import io.github.randomtools3377.fitness.core.Product
 import io.github.randomtools3377.fitness.core.Recipe
@@ -151,6 +152,12 @@ class Repository(private val context: Context, val db: AppDatabase) {
         }
     }
 
+    // Fasting (0.6.0).
+    val fasts: Flow<List<Fast>> = dao.fasts().map { r -> r.map { it.toCore() } }
+    suspend fun fastsOnce(): List<Fast> = dao.allFasts().map { it.toCore() }
+    suspend fun saveFast(f: Fast): Long = if (f.id == 0L) dao.putFast(f.toRow()) else { dao.putFast(f.toRow()); f.id }
+    suspend fun deleteFast(id: Long) = dao.deleteFast(id)
+
     // Saved meals.
     val savedMeals: Flow<List<SavedMeal>> = combine(dao.savedMeals(), dao.savedMealItems()) { m, i -> savedMealsOf(m, i) }
 
@@ -243,6 +250,7 @@ class Repository(private val context: Context, val db: AppDatabase) {
                 restSeconds = dao.allRestTimes().associate { it.exerciseKey to it.seconds },
                 recipes = dao.allRecipes().filter { !it.hidden }.map { it.toCore() },
                 shopping = dao.allShopping().map { it.toCore() },
+                fasts = dao.allFasts().map { it.toCore() },
             )
         }
         return Backup.encode(backup)
@@ -269,6 +277,7 @@ class Repository(private val context: Context, val db: AppDatabase) {
             dao.clearRestTimes()
             dao.clearRecipes()
             dao.clearShopping()
+            dao.clearFasts()
             dao.insertFoods(backup.foods.map { it.toRow(now) })
             dao.insertEntries(backup.entries.map { it.toRow() })
             for (meal in backup.savedMeals) {
@@ -296,6 +305,7 @@ class Repository(private val context: Context, val db: AppDatabase) {
             // Recipes keep their ids, so planned and logged items still point to them.
             for (r in backup.recipes) dao.putRecipe(r.toRow())
             dao.insertShopping(backup.shopping.map { it.copy(id = 0).toRow() })
+            for (f in backup.fasts) dao.putFast(f.toRow())
         }
     }
 

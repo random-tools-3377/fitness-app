@@ -72,6 +72,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- The alarm when a fast is done (0.6.0). -->
+        <receiver
+            android:name=".fasting.FastDoneReceiver"
+            android:exported="false" />
+
         <!-- The rest timer's alarm. -->
         <receiver
             android:name=".workout.RestDoneReceiver"

@@ -62,19 +62,20 @@ import kotlinx.datetime.plus
 /** The Plan tab: meals planned ahead, the shopping list, and recipes. */
 @Composable
 fun PlanScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
-    var part by rememberSaveable { mutableStateOf("meals") }
+    val part by vm.planPart.collectAsState()
     Column(modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Choices(
-                listOf("meals", "shopping", "recipes"), part,
-                { when (it) { "meals" -> "Meals"; "shopping" -> "Shopping list"; else -> "Recipes" } },
+                listOf("meals", "shopping", "recipes", "fasting"), part,
+                { when (it) { "meals" -> "Meals"; "shopping" -> "Shopping list"; "recipes" -> "Recipes"; else -> "Fasting" } },
                 { "plan:$it" },
-            ) { part = it }
+            ) { vm.planPart.value = it }
         }
         when (part) {
             "meals" -> PlanMeals(vm, open)
             "shopping" -> ShoppingList(vm)
-            else -> RecipeList(vm, open)
+            "recipes" -> RecipeList(vm, open)
+            else -> FastingPart(vm)
         }
     }
 }
