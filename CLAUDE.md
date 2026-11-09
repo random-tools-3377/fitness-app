@@ -58,7 +58,13 @@ workouts or exports.
 - The built-in common foods come from the US government's food data (USDA FoodData Central,
   public domain) and are bundled with the app **(default: its basic foods and "as eaten" dishes,
   several thousand in all)**.
-- Barcode scanning covers as many countries as possible, and the user picks theirs.
+- European foods are built in too: France's food table, CIQUAL (Anses, Licence Ouverte / Etalab
+  Open Licence 2.0, which needs a credit in the app), with its English names, alongside the USDA
+  list.
+- Carbs are shown the way EU labels give them, without fibre, for every food, the USDA ones
+  included. Typed-in labels can be entered in kJ or kcal, per 100 g (or 100 ml) or per serving.
+- Barcode scanning covers as many countries as possible, every EU country included, and the user
+  picks theirs.
 - **How that works with no internet (default):** the app itself stays small. Each country's
   packaged products are a separate file on the Releases page, built from Open Food Facts (its
   database licence, ODbL, needs a credit in the app and in the files). The user downloads the
