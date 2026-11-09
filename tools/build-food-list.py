@@ -25,7 +25,9 @@ Each line of foods.tsv is:
     id <TAB> name <TAB> kcal <TAB> protein <TAB> carbs <TAB> fat <TAB> portions
        <TAB> fibre <TAB> sugar <TAB> saturated fat <TAB> salt
 
-The last four, added for 0.7.0, are empty when the table doesn't give them. Salt is worked out
+The last four, added for 0.7.0, are empty when the table doesn't give them. After them come
+alcohol (g), caffeine (mg), iron, calcium, vitamin D, vitamin C, potassium, magnesium, vitamin
+B12, folate, zinc and vitamin A (0.11.0; see MICROS for the units), also empty when not given. Salt is worked out
 from USDA's sodium (mg × 2.5 ÷ 1000), the way EU labels count it; CIQUAL gives salt itself.
 
 Nutrients are per 100 g. The id is the source letter and the food's id in that table: F, S or N
@@ -89,6 +91,23 @@ FAT = [1004, 1085]  # Total lipid (fat); Total fat (NLEA)
 SUGARS = [2000, 1063]  # Sugars, total including NLEA; Sugars, Total NLEA
 SAT_FAT = [1258]  # Fatty acids, total saturated
 SODIUM_MG = [1093]  # Sodium, Na (mg); salt is sodium x 2.5
+
+# Alcohol, caffeine, and vitamins and minerals (0.11.0), in the order of the app's Micro.COLUMNS:
+# (name, USDA nutrient ids best first, CIQUAL constituent name patterns, decimals).
+MICROS = [
+    ("alcohol", [1018], [r"^Alcohol"], 1),            # g
+    ("caffeine", [1057], [r"^Caffeine"], 1),          # mg (CIQUAL has none)
+    ("iron", [1089], [r"^Iron"], 2),                  # mg
+    ("calcium", [1087], [r"^Calcium"], 1),            # mg
+    ("vitD", [1114], [r"^Vitamin D \("], 2),          # µg
+    ("vitC", [1162], [r"^Vitamin C"], 1),             # mg
+    ("potassium", [1092], [r"^Potassium"], 1),        # mg
+    ("magnesium", [1090], [r"^Magnesium"], 1),        # mg
+    ("b12", [1178], [r"^Vitamin B12"], 2),            # µg
+    ("folate", [1190, 1177], [r"^Vitamin B9", r"Folate"], 1),  # µg (dietary folate equivalents where given)
+    ("zinc", [1095], [r"^Zinc"], 2),                  # mg
+    ("vitA", [1106], [], 1),                          # µg RAE; CIQUAL: retinol + beta-carotene / 12
+]
 
 MAX_PORTIONS = 8
 
@@ -218,6 +237,15 @@ def first(amounts, ids):
     return None
 
 
+def micro_columns(get):
+    """The MICROS columns, from get(name) giving a number or None."""
+    out = []
+    for name, _, _, places in MICROS:
+        x = get(name)
+        out.append("" if x is None else ("%.*f" % (places, x)).rstrip("0").rstrip("."))
+    return out
+
+
 def optional(x, places=1):
     """An extra nutrient: its number, or "" when the table doesn't give it. Salt keeps two decimals."""
     if x is None:
@@ -303,7 +331,7 @@ def usda_row(food, letter):
         optional(first(amounts, SUGARS)),
         optional(first(amounts, SAT_FAT)),
         optional(salt_from_sodium(first(amounts, SODIUM_MG)), 2),
-    ]
+    ] + micro_columns(lambda name: first(amounts, next(m[1] for m in MICROS if m[0] == name)))
 
 
 def build_usda(args, work):
@@ -449,6 +477,15 @@ def ciqual_value(text):
         return None
 
 
+def find_const_optional(consts, *patterns):
+    """Like find_const, but (None, "") when the table has no such constituent."""
+    for pattern in patterns:
+        for code, name in consts.items():
+            if re.search(pattern, name, re.IGNORECASE):
+                return code, name
+    return None, ""
+
+
 def find_const(consts, *patterns):
     """The CIQUAL constituent code whose English name matches the first pattern that matches one."""
     for pattern in patterns:
@@ -456,6 +493,15 @@ def find_const(consts, *patterns):
             if re.search(pattern, name, re.IGNORECASE):
                 return code, name
     sys.exit("CIQUAL: no constituent matching %s" % (patterns,))
+
+
+def ciqual_vit_a(v, retinol, beta_carotene):
+    """Vitamin A as retinol activity equivalents: retinol plus beta-carotene / 12."""
+    r = v.get(retinol) if retinol else None
+    b = v.get(beta_carotene) if beta_carotene else None
+    if r is None and b is None:
+        return None
+    return (r or 0.0) + (b or 0.0) / 12.0
 
 
 def build_ciqual(args, work):
@@ -491,7 +537,15 @@ def build_ciqual(args, work):
     for label, (code, name) in [("kcal", kcal), ("kJ", kj), ("protein", protein), ("carbs", carbs), ("fat", fat)] + extras:
         print("CIQUAL %s: %s %s" % (label, code, name))
 
-    wanted = {kcal[0], kj[0], protein[0], carbs[0], fat[0], fibre[0], sugars[0], sat_fat[0], salt[0]}
+    micro_codes = {name: find_const_optional(consts, *patterns)[0] if patterns else None for name, _, patterns, _ in MICROS}
+    retinol = find_const_optional(consts, r"^Retinol")[0]
+    beta_carotene = find_const_optional(consts, r"^Beta-carotene", r"^Beta carotene")[0]
+    for name, code in micro_codes.items():
+        print("CIQUAL %s: %s %s" % (name, code, consts.get(code, "(none)")))
+    print("CIQUAL retinol: %s, beta-carotene: %s" % (retinol, beta_carotene))
+
+    wanted = {kcal[0], kj[0], protein[0], carbs[0], fat[0], fibre[0], sugars[0], sat_fat[0], salt[0], retinol, beta_carotene}
+    wanted |= {c for c in micro_codes.values() if c}
     values = {}
     for c in compo:
         code = c.get("const_code")
@@ -519,7 +573,7 @@ def build_ciqual(args, work):
             optional(v.get(sugars[0])),
             optional(v.get(sat_fat[0])),
             optional(v.get(salt[0]), 2),
-        ])
+        ] + micro_columns(lambda name: ciqual_vit_a(v, retinol, beta_carotene) if name == "vitA" else (v.get(micro_codes[name]) if micro_codes[name] else None)))
     name = re.sub(r"^ciqual-(\d+-)?", "", os.path.basename(path))
     print("%s (%s): %d foods, %d kept" % (CIQUAL_TITLE, name, len(alim), len(rows)))
     return rows, [(CIQUAL_TITLE, name, len(rows))]
@@ -539,7 +593,8 @@ CIQUAL
   Anses. Ciqual French food composition table. https://ciqual.anses.fr
   Under the Licence Ouverte / Etalab Open Licence 2.0
   (https://www.etalab.gouv.fr/licence-ouverte-open-licence/). Only the English food names and
-  the energy, protein, carbohydrate, fat, fibre, sugars, saturated fat and salt values are used. This app is not endorsed by Anses.
+  the energy, protein, carbohydrate, fat, fibre, sugars, saturated fat, salt, alcohol, vitamin
+  and mineral values are used. This app is not endorsed by Anses.
 """
 
 NOTICE_END = """
@@ -579,8 +634,9 @@ def main():
         f.write("# Made by tools/build-food-list.py. See foods-NOTICE.txt.\n")
         for title, name, kept in used:
             f.write("# %s: %s, %d foods\n" % (title, name, kept))
-        f.write("# id\tname\tkcal\tprotein\tcarbs\tfat\tportions\tfibre\tsugar\tsaturates\tsalt"
-                "   (per 100 g; carbs without fibre; portions label=grams; an empty extra is not known)\n")
+        f.write("# id\tname\tkcal\tprotein\tcarbs\tfat\tportions\tfibre\tsugar\tsaturates\tsalt\t"
+                + "\t".join(m[0] for m in MICROS)
+                + "   (per 100 g; carbs without fibre; portions label=grams; an empty extra is not known)\n")
         for row in rows:
             f.write("\t".join(row) + "\n")
     print(len(rows), "foods written to", target)

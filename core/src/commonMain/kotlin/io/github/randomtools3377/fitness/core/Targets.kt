@@ -208,4 +208,7 @@ data class ExtraTargets(
     val sugar: Double? = null,
     val satFat: Double? = null,
     val salt: Double? = null,
+    /** Daily limits for alcohol, in standard drinks, and caffeine, in mg (0.11.0). */
+    val alcoholDrinks: Double? = null,
+    val caffeineMg: Double? = null,
 )
