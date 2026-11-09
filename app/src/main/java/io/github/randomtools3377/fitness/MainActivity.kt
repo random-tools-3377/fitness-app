@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
 import io.github.randomtools3377.fitness.ui.FitnessApp
 import io.github.randomtools3377.fitness.ui.FitnessTheme
+import io.github.randomtools3377.fitness.ui.BodyViewModel
 import io.github.randomtools3377.fitness.ui.MainViewModel
 import io.github.randomtools3377.fitness.ui.StatsViewModel
 import io.github.randomtools3377.fitness.ui.WorkoutViewModel
@@ -17,6 +18,7 @@ class MainActivity : FragmentActivity() {
     private val vm: MainViewModel by viewModels()
     private val wvm: WorkoutViewModel by viewModels()
     private val svm: StatsViewModel by viewModels()
+    private val bvm: BodyViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -25,7 +27,7 @@ class MainActivity : FragmentActivity() {
         handle(intent)
         setContent {
             FitnessTheme {
-                FitnessApp(vm, wvm, svm)
+                FitnessApp(vm, wvm, svm, bvm)
             }
         }
     }

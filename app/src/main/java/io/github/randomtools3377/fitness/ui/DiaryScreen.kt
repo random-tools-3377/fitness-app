@@ -67,7 +67,7 @@ fun dayName(d: LocalDate, today: LocalDate): String = when (d) {
 }
 
 @Composable
-fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
+fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open: (Route) -> Unit) {
     val day by vm.day.collectAsState()
     val entries by vm.entries.collectAsState()
     val totals by vm.totals.collectAsState()
@@ -175,6 +175,9 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
                 )
             }
         }
+        // Habits and sleep and mood for the day shown (0.8.0).
+        item(key = "habits") { HabitsCard(bvm, day) }
+        item(key = "sleep") { SleepMoodCard(bvm, day) }
         item { Spacer(Modifier.height(24.dp)) }
     }
 

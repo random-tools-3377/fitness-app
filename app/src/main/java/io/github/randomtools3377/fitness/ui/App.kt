@@ -83,12 +83,14 @@ sealed interface Route {
 }
 
 @Composable
-fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel) {
+fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bvm: BodyViewModel) {
     var tab by rememberSaveable { mutableStateOf(Tab.DIARY) }
     val stack = remember { mutableStateListOf<Route>() }
     val snackbar = remember { SnackbarHostState() }
     val message by vm.message.collectAsState()
     val workoutMessage by wvm.message.collectAsState()
+    val bodyMessage by bvm.message.collectAsState()
+    val checkIn by bvm.checkIn.collectAsState()
     val offer by vm.targetOffer.collectAsState()
     val units by vm.units.collectAsState()
     val settings by vm.settings.collectAsState()
@@ -110,6 +112,12 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel) {
     LaunchedEffect(message) {
         val m = message ?: return@LaunchedEffect
         vm.message.value = null
+        snackbar.showSnackbar(m)
+    }
+
+    LaunchedEffect(bodyMessage) {
+        val m = bodyMessage ?: return@LaunchedEffect
+        bvm.message.value = null
         snackbar.showSnackbar(m)
     }
 
@@ -148,14 +156,33 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel) {
                 LockedScreen(modifier, onUnlocked = { vm.markUnlocked(tab.name) })
             } else {
                 when (tab) {
-                    Tab.DIARY -> DiaryScreen(vm, modifier, open = ::open)
+                    Tab.DIARY -> DiaryScreen(vm, bvm, modifier, open = ::open)
                     Tab.FOODS -> FoodsScreen(vm, modifier, open = ::open)
                     Tab.WORKOUTS -> WorkoutsScreen(wvm, vm, modifier, open = ::open)
                     Tab.PROGRESS -> Column(modifier) {
-                        Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                            Choices(listOf("stats", "weight"), progressPart, { if (it == "stats") "Stats and streaks" else "Weight" }, { "progress:$it" }) { progressPart = it }
+                        // The weekly check-in (0.8.0), from Monday until closed.
+                        checkIn?.let { c ->
+                            CheckInCard(c, units, onTake = { bvm.takeCheckInTarget(it) }, onClose = { bvm.closeCheckIn() })
                         }
-                        if (progressPart == "stats") StatsScreen(svm, Modifier) else WeightScreen(vm, Modifier)
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            Choices(
+                                listOf("stats", "weight", "body", "habits"), progressPart,
+                                { when (it) { "stats" -> "Stats"; "weight" -> "Weight"; "body" -> "Body"; else -> "Habits" } },
+                                { "progress:$it" },
+                            ) { progressPart = it }
+                        }
+                        when (progressPart) {
+                            "stats" -> StatsScreen(svm, Modifier)
+                            "weight" -> WeightScreen(vm, Modifier)
+                            "body" -> MeasurementsScreen(bvm, Modifier)
+                            else -> {
+                                val entries by svm.entries.collectAsState()
+                                val kcalByDay = remember(entries) {
+                                    entries.filter { !it.planned }.groupBy { it.day }.mapValues { (_, l) -> l.sumOf { it.nutrients.kcal } }
+                                }
+                                HabitsScreen(bvm, kcalByDay, Modifier)
+                            }
+                        }
                     }
                     Tab.PLAN -> PlanScreen(vm, modifier, open = ::open)
                 }
