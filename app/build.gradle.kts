@@ -18,7 +18,7 @@ fun versionCodeOf(name: String): Int {
 
 android {
     namespace = "io.github.randomtools3377.fitness"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.randomtools3377.fitness"
