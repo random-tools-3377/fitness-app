@@ -336,6 +336,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         message.value = "Saved"
     }
 
+    /** The bar and plates for the plate calculator (0.9.0). */
+    fun setPlates(p: io.github.randomtools3377.fitness.core.PlateSettings, bar: Double?, plates: List<Double>) = launchSafely {
+        io.github.randomtools3377.fitness.core.Plates.problem(bar, plates)?.let { throw IllegalArgumentException(it) }
+        repo.updateSettings { it.copy(plates = p) }
+        message.value = "Saved"
+    }
+
     fun setWorkoutsPerWeek(n: Int) = launchSafely {
         require(n in 1..14) { "Choose between 1 and 14 workouts a week." }
         repo.updateSettings { it.copy(workoutsPerWeek = n) }

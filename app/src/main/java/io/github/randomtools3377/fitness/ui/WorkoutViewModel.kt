@@ -217,10 +217,6 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setProgramme(p: Map<Int, Long>) = viewModelScope.launch { repo.updateSettings { it.copy(programme = p) } }
 
-    fun setPlates(p: io.github.randomtools3377.fitness.core.PlateSettings) = viewModelScope.launch {
-        repo.updateSettings { it.copy(plates = p) }
-        message.value = "Saved"
-    }
 
     fun setRest(key: String, seconds: Int) = viewModelScope.launch {
         repo.setRest(key, seconds.coerceIn(5, 3600))

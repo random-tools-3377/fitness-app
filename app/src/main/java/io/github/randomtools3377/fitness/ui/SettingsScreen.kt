@@ -106,6 +106,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
                 Switch(checked = settings.burnedHalf, onCheckedChange = { vm.setBurnedHalf(it) }, modifier = Modifier.testTag("burned-half"))
             }
             WorkoutsPerWeekRow(vm, settings)
+            PlatesRow(vm, settings)
         }
 
         RemindersSection(vm, settings)

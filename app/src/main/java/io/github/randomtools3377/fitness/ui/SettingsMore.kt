@@ -298,3 +298,33 @@ fun ExtraTargetsSection(vm: MainViewModel, settings: AppSettings) {
         ) { Text("Save") }
     }
 }
+
+/** The bar and plates for the plate calculator, in the weight unit in use (0.9.0). */
+@Composable
+fun PlatesRow(vm: MainViewModel, settings: AppSettings) {
+    val p = settings.plates
+    val lb = (settings.units?.weight ?: io.github.randomtools3377.fitness.core.UnitSettings.forRegion(java.util.Locale.getDefault().country).weight) ==
+        io.github.randomtools3377.fitness.core.WeightUnit.LB
+    val unit = if (lb) "lb" else "kg"
+    fun list(xs: List<Double>) = xs.joinToString(", ") { io.github.randomtools3377.fitness.core.formatAmount(it) }
+    var bar by remember(p, lb) { mutableStateOf(io.github.randomtools3377.fitness.core.formatAmount(if (lb) p.barLb else p.barKg)) }
+    var plates by remember(p, lb) { mutableStateOf(list(if (lb) p.platesLb else p.platesKg)) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Plate calculator: your bar and plates ($unit)")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            NumberField(bar, { bar = it }, "Bar", "field:bar", Modifier.width(100.dp), suffix = unit)
+            OutlinedTextField(
+                value = plates, onValueChange = { plates = it }, label = { Text("Plates, like 20, 10, 5") }, singleLine = true,
+                modifier = Modifier.weight(1f).testTag("field:plates"),
+            )
+        }
+        TextButton(
+            onClick = {
+                val b = io.github.randomtools3377.fitness.core.Units.parse(bar)
+                val ps = plates.split(',', ';', ' ').mapNotNull { io.github.randomtools3377.fitness.core.Units.parse(it.trim()) }
+                vm.setPlates(if (lb) p.copy(barLb = b ?: -1.0, platesLb = ps) else p.copy(barKg = b ?: -1.0, platesKg = ps), b, ps)
+            },
+            modifier = Modifier.testTag("save-plates"),
+        ) { Text("Save the bar and plates") }
+    }
+}

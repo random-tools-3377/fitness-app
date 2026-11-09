@@ -20,7 +20,7 @@ class MigrationTest {
     private val name = "migration-test.db"
 
     /** The current database version; raise it with each new one. */
-    private val LATEST = 7
+    private val LATEST = 8
 
     @get:Rule
     val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), AppDatabase::class.java)
