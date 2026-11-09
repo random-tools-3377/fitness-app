@@ -4,11 +4,18 @@ USDA FoodData Central
   U.S. Department of Agriculture, Agricultural Research Service. FoodData Central.
   https://fdc.nal.usda.gov. In the public domain (CC0 1.0). This app is not endorsed by the USDA.
 
+CIQUAL
+  Anses. Ciqual French food composition table. https://ciqual.anses.fr
+  Under the Licence Ouverte / Etalab Open Licence 2.0
+  (https://www.etalab.gouv.fr/licence-ouverte-open-licence/). Only the English food names and
+  the energy, protein, carbohydrate and fat values are used. This app is not endorsed by Anses.
+
 The files used:
 
   - USDA Foundation Foods: FoodData_Central_foundation_food_json_2026-10-29.zip (373 foods)
   - USDA SR Legacy: FoodData_Central_sr_legacy_food_json_2018-04.zip (7703 foods)
   - USDA FNDDS (Survey Foods): FoodData_Central_survey_food_json_2024-10-31.zip (5326 foods)
+  - CIQUAL (France): XML_2020_07_07.zip (2298 foods)
 
 Changes made: nutrients are per 100 g, rounded to one decimal. Carbs are given without fibre, as
 on EU labels: where USDA gives carbohydrate including fibre, the fibre was taken off. A value
