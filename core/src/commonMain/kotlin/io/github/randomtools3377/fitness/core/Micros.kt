@@ -4,6 +4,7 @@ import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 import kotlin.math.roundToInt
 
 /**
@@ -40,9 +41,7 @@ enum class Micro(val key: String, val title: String, val unit: String, val refer
 
 object Micros {
     private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-    private val serializer = kotlinx.serialization.builtins.MapSerializer(
-        kotlinx.serialization.builtins.serializer<String>(), kotlinx.serialization.builtins.serializer<Double>(),
-    )
+    private val serializer = kotlinx.serialization.builtins.MapSerializer(String.serializer(), Double.serializer())
 
     /** For the database: the map as JSON, or null when empty. */
     fun encode(m: Map<String, Double>): String? = if (m.isEmpty()) null else json.encodeToString(serializer, m)

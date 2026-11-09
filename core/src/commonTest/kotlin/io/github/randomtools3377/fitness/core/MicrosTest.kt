@@ -20,6 +20,15 @@ class MicrosTest {
     }
 
     @Test
+    fun microsGoInAndOutOfTheDatabase() {
+        val m = mapOf("alcohol" to 3.9, "iron" to 0.02)
+        assertEquals(m, Micros.decode(Micros.encode(m)))
+        assertNull(Micros.encode(emptyMap()))
+        assertEquals(emptyMap(), Micros.decode(null))
+        assertEquals(emptyMap(), Micros.decode("not json"))
+    }
+
+    @Test
     fun builtInFoodsReadTheMicroColumns() {
         val line = "S1\tBeer\t43\t0.5\t3.6\t0\t\t0\t0\t0\t0.01\t3.9\t\t0.02\t4"
         val f = BuiltInFoods.parse(line).single()
