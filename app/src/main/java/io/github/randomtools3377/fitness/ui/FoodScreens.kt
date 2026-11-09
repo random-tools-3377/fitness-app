@@ -1,5 +1,7 @@
 package io.github.randomtools3377.fitness.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -212,6 +214,13 @@ fun FoodsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
     var deleting by remember { mutableStateOf<Food?>(null) }
     var deletingMeal by remember { mutableStateOf<SavedMeal?>(null) }
     var renaming by remember { mutableStateOf<SavedMeal?>(null) }
+    val pendingImport by vm.foodImport.collectAsState()
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.previewFoodImport(uri)
+    }
+    val templateLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) vm.saveFoodTemplate(uri)
+    }
 
     LazyColumn(modifier.fillMaxSize().testTag("foods-list")) {
         item {
@@ -250,6 +259,24 @@ fun FoodsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Your foods", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = { open(Route.FoodForm()) }, modifier = Modifier.testTag("new-food-tab")) { Text("New food") }
+            }
+        }
+        item {
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                Text(
+                    "Have your own list? Import it from a spreadsheet saved as CSV. Start from the template, " +
+                        "one food per row.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp, bottom = 8.dp)) {
+                    OutlinedButton(
+                        onClick = { importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain", "application/vnd.ms-excel", "*/*")) },
+                        modifier = Modifier.testTag("import-foods"),
+                    ) { Text("Import a spreadsheet") }
+                    TextButton(onClick = { templateLauncher.launch("fitness-foods-template.csv") }, modifier = Modifier.testTag("food-template")) {
+                        Text("Save a template")
+                    }
+                }
             }
         }
         if (mine.isEmpty()) {
@@ -300,6 +327,37 @@ fun FoodsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
             "Delete",
             onConfirm = { vm.deleteSavedMeal(m); deletingMeal = null },
             onDismiss = { deletingMeal = null },
+        )
+    }
+    pendingImport?.let { r ->
+        AlertDialog(
+            onDismissRequest = { vm.foodImport.value = null },
+            title = { Text("Import foods") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(r.summary(), style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("food-import-summary"))
+                    if (r.foods.isNotEmpty()) {
+                        Text(
+                            r.foods.take(5).joinToString { it.displayName() } + if (r.foods.size > 5) ", and ${r.foods.size - 5} more" else "",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    if (r.problems.isNotEmpty()) {
+                        Text("Left out:", style = MaterialTheme.typography.labelLarge)
+                        for (p in r.problems.take(12)) {
+                            Text((if (p.line > 0) "Row ${p.line}: " else "") + p.reason, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (r.problems.size > 12) Text("…and ${r.problems.size - 12} more.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("Nothing you already have is changed.", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmFoodImport() }, enabled = r.foods.isNotEmpty(), modifier = Modifier.testTag("confirm-food-import")) {
+                    Text(if (r.foods.size == 1) "Add 1 food" else "Add ${r.foods.size} foods")
+                }
+            },
+            dismissButton = { TextButton(onClick = { vm.foodImport.value = null }) { Text("Cancel") } },
         )
     }
     renaming?.let { m ->

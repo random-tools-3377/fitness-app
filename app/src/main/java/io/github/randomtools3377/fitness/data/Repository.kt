@@ -59,6 +59,11 @@ class Repository(private val context: Context, val db: AppDatabase) {
             food.id
         }
 
+    /** Adds several new foods at once, as one step. */
+    suspend fun addFoods(foods: List<Food>, now: Long) {
+        db.withTransaction { for (f in foods) dao.insertFood(f.copy(id = 0).toRow(now)) }
+    }
+
     /** Takes a food off the lists. What was already logged keeps its numbers. */
     suspend fun deleteFood(id: Long) = dao.hideFood(id)
 

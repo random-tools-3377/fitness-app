@@ -55,6 +55,12 @@ workouts or exports.
 - Three ways to find a food: foods the user types in from the label, a built-in list of common
   foods, and barcode scanning.
 - Typed-in foods are remembered, with their portions, and so are saved meals.
+- The user's own food list can be imported from a spreadsheet saved as CSV, through the system
+  file dialog, adding to the typed-in foods. **Details (default):** one food per row, with a
+  header row naming the columns; comma or semicolon separators, and decimal commas with
+  semicolons; per 100 g, per 100 ml or per serving; energy in kcal or kJ; portions like
+  "1 slice=30". Nothing is replaced, a food already there by name and brand is skipped, and the
+  rows that can't be read are listed with the reason. The app can save a template to fill in.
 - The built-in common foods come from the US government's food data (USDA FoodData Central,
   public domain) and are bundled with the app **(default: its basic foods and "as eaten" dishes,
   several thousand in all)**.
@@ -217,6 +223,7 @@ Build order **(default)**, each step a Release the owner can try:
 
 1. The food diary: typed-in foods, built-in common foods, saved meals, quick add, the worked-out
    target, protein, carbs and fat, water, body weight, export and import. (0.1.0)
+   Then importing the user's own food list from a spreadsheet. (0.1.1)
 2. Workouts: weights, cardio, bodyweight and timed, saved workouts, the rest timer, personal
    bests, and calories burned added to the day. (0.2.0)
 3. Barcode scanning and the country files. (0.3.0)

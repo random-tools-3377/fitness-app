@@ -13,6 +13,7 @@ import io.github.randomtools3377.fitness.core.DayTotals
 import io.github.randomtools3377.fitness.core.Diary
 import io.github.randomtools3377.fitness.core.DiaryEntry
 import io.github.randomtools3377.fitness.core.Food
+import io.github.randomtools3377.fitness.core.FoodCsv
 import io.github.randomtools3377.fitness.core.FoodSearch
 import io.github.randomtools3377.fitness.core.MacroTargets
 import io.github.randomtools3377.fitness.core.Meal
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -208,6 +210,42 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteFood(food: Food) = launchSafely {
         repo.deleteFood(food.id)
         message.value = "Deleted ${food.name}"
+    }
+
+    // Importing the user's own food list from a spreadsheet (CSV).
+
+    /** What a chosen spreadsheet holds, shown before anything is added. */
+    val foodImport = MutableStateFlow<FoodCsv.Result?>(null)
+
+    fun previewFoodImport(uri: Uri) = viewModelScope.launch {
+        try {
+            val text = withContext(Dispatchers.IO) {
+                resolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+            }
+            val parsed = withContext(Dispatchers.Default) { FoodCsv.withoutExisting(FoodCsv.parse(text), repo.foods.first()) }
+            foodImport.value = parsed
+        } catch (e: Exception) {
+            message.value = "The file could not be read."
+        }
+    }
+
+    fun confirmFoodImport() = viewModelScope.launch {
+        val r = foodImport.value ?: return@launch
+        foodImport.value = null
+        if (r.foods.isEmpty()) return@launch
+        repo.addFoods(r.foods, now())
+        message.value = if (r.foods.size == 1) "Added 1 food" else "Added ${r.foods.size} foods"
+    }
+
+    fun saveFoodTemplate(uri: Uri) = viewModelScope.launch {
+        try {
+            withContext(Dispatchers.IO) {
+                resolver.openOutputStream(uri, "wt")!!.use { it.write(FoodCsv.TEMPLATE.toByteArray(Charsets.UTF_8)) }
+            }
+            message.value = "Template saved. Fill it in, save it as CSV, then import it."
+        } catch (e: Exception) {
+            message.value = "The file could not be written."
+        }
     }
 
     // Water.
