@@ -65,7 +65,11 @@ object Products {
             barcode = code,
             name = f[1],
             brand = f[2],
-            per100 = Nutrients(kcal, f[4].toDoubleOrNull() ?: 0.0, f[5].toDoubleOrNull() ?: 0.0, f[6].toDoubleOrNull() ?: 0.0),
+            per100 = Nutrients(
+                kcal, f[4].toDoubleOrNull() ?: 0.0, f[5].toDoubleOrNull() ?: 0.0, f[6].toDoubleOrNull() ?: 0.0,
+                fibre = f.getOrNull(9)?.toDoubleOrNull(), sugar = f.getOrNull(10)?.toDoubleOrNull(),
+                satFat = f.getOrNull(11)?.toDoubleOrNull(), salt = f.getOrNull(12)?.toDoubleOrNull(),
+            ),
             servingGrams = f.getOrNull(7)?.toDoubleOrNull()?.takeIf { it > 0 },
             servingLabel = f.getOrNull(8).orEmpty(),
         )

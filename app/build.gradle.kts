@@ -96,6 +96,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     // Barcode scanning (0.3.0): ZXing, Apache-2.0, works offline.
     implementation(libs.zxing.android.embedded)
+    implementation(libs.tesseract4android)
     // The privacy lock (0.4.0) asks for the phone's own fingerprint, face or PIN.
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment.ktx)

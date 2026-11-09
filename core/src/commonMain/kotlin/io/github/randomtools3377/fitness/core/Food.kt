@@ -3,21 +3,45 @@ package io.github.randomtools3377.fitness.core
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
-/** Calories (kcal) and grams of protein, carbs and fat. */
+/**
+ * Calories (kcal) and grams of protein, carbs and fat; and, where known, grams of fibre, sugar,
+ * saturated fat and salt (0.7.0). An unknown extra is null, not 0: a total with one known part
+ * and one unknown counts the known part only.
+ */
 @Serializable
 data class Nutrients(
     val kcal: Double = 0.0,
     val protein: Double = 0.0,
     val carbs: Double = 0.0,
     val fat: Double = 0.0,
+    val fibre: Double? = null,
+    val sugar: Double? = null,
+    val satFat: Double? = null,
+    val salt: Double? = null,
 ) {
-    operator fun plus(other: Nutrients) =
-        Nutrients(kcal + other.kcal, protein + other.protein, carbs + other.carbs, fat + other.fat)
+    operator fun plus(other: Nutrients) = Nutrients(
+        kcal + other.kcal, protein + other.protein, carbs + other.carbs, fat + other.fat,
+        add(fibre, other.fibre), add(sugar, other.sugar), add(satFat, other.satFat), add(salt, other.salt),
+    )
 
-    operator fun times(factor: Double) = Nutrients(kcal * factor, protein * factor, carbs * factor, fat * factor)
+    operator fun times(factor: Double) = Nutrients(
+        kcal * factor, protein * factor, carbs * factor, fat * factor,
+        fibre?.times(factor), sugar?.times(factor), satFat?.times(factor), salt?.times(factor),
+    )
+
+    /** Whether any of fibre, sugar, saturated fat or salt is known. */
+    val hasExtras: Boolean get() = fibre != null || sugar != null || satFat != null || salt != null
+
+    /** The same calories, protein, carbs and fat, with the extras taken from [other]. */
+    fun withExtras(other: Nutrients) = copy(fibre = other.fibre, sugar = other.sugar, satFat = other.satFat, salt = other.salt)
 
     companion object {
         val ZERO = Nutrients()
+
+        private fun add(a: Double?, b: Double?): Double? = if (a == null) b else if (b == null) a else a + b
+
+        /** Grams of salt from milligrams of sodium, as EU labels count it (× 2.5). */
+        fun saltFromSodiumMg(mg: Double): Double = mg * 2.5 / 1000.0
     }
 }
 
@@ -113,13 +137,16 @@ object Label {
     fun problems(name: String, per100: Nutrients, unit: BaseUnit = BaseUnit.GRAM): List<String> {
         val out = mutableListOf<String>()
         if (name.isBlank()) out += "Give the food a name."
-        if (per100.kcal < 0 || per100.protein < 0 || per100.carbs < 0 || per100.fat < 0) {
+        val extras = listOfNotNull(per100.fibre, per100.sugar, per100.satFat, per100.salt)
+        if (per100.kcal < 0 || per100.protein < 0 || per100.carbs < 0 || per100.fat < 0 || extras.any { it < 0 }) {
             out += "Numbers can't be below zero."
         }
         // Only by weight: 100 ml of syrup can hold more than 100 g of sugar.
         if (unit == BaseUnit.GRAM && per100.protein + per100.carbs + per100.fat > 100.5) {
             out += "Protein, carbs and fat add up to more than the food weighs. Check the numbers and the serving size."
         }
+        if ((per100.sugar ?: 0.0) > per100.carbs + 0.05) out += "Sugar is part of the carbs, so it can't be more than the carbs."
+        if ((per100.satFat ?: 0.0) > per100.fat + 0.05) out += "Saturated fat is part of the fat, so it can't be more than the fat."
         if (unit == BaseUnit.GRAM && per100.kcal > 950) out += "That is more calories than pure fat has. Check the numbers and the serving size."
         return out
     }

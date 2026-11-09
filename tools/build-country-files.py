@@ -13,6 +13,7 @@ Each product with calories filled in is kept, in every country Open Food Facts s
 in. Each output file, products-<country>.tsv.gz, holds these lines after a few "#" comment lines:
 
     barcode <TAB> name <TAB> brand <TAB> kcal <TAB> protein <TAB> carbs <TAB> fat <TAB> serving g <TAB> serving label
+            <TAB> fibre <TAB> sugar <TAB> saturated fat <TAB> salt   (the last four from 0.7.0; empty if not known)
 
 Nutrients are per 100 g (or 100 ml for drinks, as labelled). Carbs are given without fibre, as on
 EU labels: for products in the United States file, whose labels count fibre in the carbs, the
@@ -109,6 +110,13 @@ def sentence_case(text):
     return text
 
 
+def optional(x, places=1):
+    """An extra nutrient: its number, or "" when not known. Salt keeps two decimals."""
+    if x is None:
+        return ""
+    return number(x) if places == 1 else ("%.2f" % x).rstrip("0").rstrip(".")
+
+
 def plausible(kcal, protein, carbs, fat):
     if kcal is None or kcal > 950:
         return False
@@ -126,7 +134,8 @@ def read_off(path, us_fibre):
         header = next(reader)
         col = {name: i for i, name in enumerate(header)}
         need = ["code", "product_name", "brands", "countries_tags", "energy-kcal_100g", "energy_100g",
-                "proteins_100g", "carbohydrates_100g", "fat_100g", "fiber_100g", "serving_quantity", "serving_size"]
+                "proteins_100g", "carbohydrates_100g", "fat_100g", "fiber_100g", "serving_quantity", "serving_size",
+                "sugars_100g", "saturated-fat_100g", "salt_100g"]
         missing = [n for n in need if n not in col]
         if missing:
             sys.exit("The Open Food Facts export has no columns %s" % missing)
@@ -157,9 +166,12 @@ def read_off(path, us_fibre):
             serving_g = value(get("serving_quantity"))
             label = clean(get("serving_size"))[:40]
             brand = clean(get("brands").split(",")[0])[:60]
-            fibre = value(get("fiber_100g")) or 0.0
+            fibre_known = value(get("fiber_100g"))
+            fibre = fibre_known or 0.0
             base = [code, name[:120], brand, number(kcal), number(protein), None, number(fat),
-                    number(serving_g) if serving_g and serving_g < 5000 else "", label if serving_g else ""]
+                    number(serving_g) if serving_g and serving_g < 5000 else "", label if serving_g else "",
+                    optional(fibre_known), optional(value(get("sugars_100g"))),
+                    optional(value(get("saturated-fat_100g"))), optional(value(get("salt_100g")), 2)]
             yield countries, base, carbs, fibre
 
 
@@ -187,7 +199,7 @@ def usda_branded_file(work, given):
 
 def read_usda_branded(path):
     """Yields US rows from USDA's Branded Foods, carbs without fibre."""
-    nutrients = {1008: 0, 1003: 1, 1005: 2, 1004: 3, 1079: 4}
+    nutrients = {1008: 0, 1003: 1, 1005: 2, 1004: 3, 1079: 4, 2000: 5, 1258: 6, 1093: 7}
     with zipfile.ZipFile(path) as z:
         def member(name):
             return next(n for n in z.namelist() if n.endswith("/" + name) or n == name)
@@ -205,7 +217,7 @@ def read_usda_branded(path):
             if nid in nutrients:
                 v = value(r.get("amount"))
                 if v is not None:
-                    values.setdefault(r["fdc_id"], [None] * 5)[nutrients[nid]] = v
+                    values.setdefault(r["fdc_id"], [None] * 8)[nutrients[nid]] = v
         print("  USDA branded nutrients for %d foods" % len(values), flush=True)
         names = {r["fdc_id"]: r.get("description", "") for r in rows("food.csv")}
         for r in rows("branded_food.csv"):
@@ -224,8 +236,10 @@ def read_usda_branded(path):
             size = value(r.get("serving_size"))
             serving_g = size if size and unit in ("g", "grm", "ml", "mlt") else None
             label = clean(r.get("household_serving_fulltext"))[:40]
+            sodium = v[7]
             yield [code, name[:120], brand, number(kcal), number(protein), number(max(0.0, carbs - fibre)), number(fat),
-                   number(serving_g) if serving_g else "", label if serving_g else ""]
+                   number(serving_g) if serving_g else "", label if serving_g else "",
+                   optional(v[4]), optional(v[5]), optional(v[6]), optional(None if sodium is None else sodium * 2.5 / 1000.0, 2)]
 
 
 # ---- Writing ----
@@ -236,7 +250,8 @@ HEADER = (
     "# under the Open Database License (ODbL 1.0, https://opendatacommons.org/licenses/odbl/1-0/);\n"
     "# individual contents under the Database Contents License (https://opendatacommons.org/licenses/dbcl/1-0/).\n"
     "{usda}"
-    "# barcode\tname\tbrand\tkcal\tprotein\tcarbs\tfat\tserving g\tserving label   (per 100 g or 100 ml; carbs without fibre)\n"
+    "# barcode\tname\tbrand\tkcal\tprotein\tcarbs\tfat\tserving g\tserving label\tfibre\tsugar\tsaturates\tsalt"
+    "   (per 100 g or 100 ml; carbs without fibre; an empty extra is not known)\n"
 )
 
 

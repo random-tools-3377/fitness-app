@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
@@ -51,6 +52,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.plus
+import kotlinx.datetime.minus
 import java.util.Locale
 
 /** A new worked-out target, offered after a weigh-in. The app never changes the target by itself. */
@@ -145,9 +147,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Products from country files that were logged before, so they show among recent foods. */
-    private val usedProducts: StateFlow<List<Food>> = usage.map { u ->
-        repo.productFoods(u.keys.filter { it.startsWith("b:P") }.map { it.removePrefix("b:P") })
+    private val usedProducts: StateFlow<List<Food>> = combine(usage, settings) { u, s -> u.keys + s.favourites }.distinctUntilChanged().map { keys ->
+        repo.productFoods(keys.filter { it.startsWith("b:P") }.map { it.removePrefix("b:P") })
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** How often each food was used, with the user's favourites (0.7.0). */
+    private val usageAndFavourites = combine(usage, settings) { u, s -> u to s.favourites }.distinctUntilChanged()
+
+    /** Stars or unstars a food, so it comes first in the search. */
+    fun setFavourite(food: Food, on: Boolean) = launchSafely {
+        repo.updateSettings { it.copy(favourites = if (on) it.favourites + food.key else it.favourites - food.key) }
+    }
 
     /** What is typed in the food search. */
     val query = MutableStateFlow("")
@@ -156,13 +166,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val recipeFoods: StateFlow<List<Food>> = repo.recipes.map { list -> list.map { it.toFood() } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val results: StateFlow<List<Food>> = combine(query.debounce(120), combine(foods, recipeFoods) { a, b -> b + a }, builtIns, usage, usedProducts) { q, mine, built, used, products ->
-        FoodSearch.search(q, mine + products + built, used, now())
+    val results: StateFlow<List<Food>> = combine(query.debounce(120), combine(foods, recipeFoods) { a, b -> b + a }, builtIns, usageAndFavourites, usedProducts) { q, mine, built, (used, favs), products ->
+        FoodSearch.search(q, mine + products + built, used, now(), favourites = favs)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Foods used before, the most recent and most used first. */
-    val recent: StateFlow<List<Food>> = combine(combine(foods, recipeFoods) { a, b -> b + a }, builtIns, usage, usedProducts) { mine, built, used, products ->
-        FoodSearch.recent(mine + products + built, used, now()).take(30)
+    val recent: StateFlow<List<Food>> = combine(combine(foods, recipeFoods) { a, b -> b + a }, builtIns, usageAndFavourites, usedProducts) { mine, built, (used, favs), products ->
+        FoodSearch.recent(mine + products + built, used, now(), favs).take(30 + favs.size)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
@@ -319,6 +329,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         io.github.randomtools3377.fitness.reminders.ReminderScheduler.schedule(getApplication(), r)
     }
 
+    /** Daily targets for fibre, sugar, saturated fat and salt (0.7.0). */
+    fun setExtraTargets(t: io.github.randomtools3377.fitness.core.ExtraTargets) = launchSafely {
+        listOfNotNull(t.fibre, t.sugar, t.satFat, t.salt).forEach { require(it > 0 && it < 1000) { "Targets are grams a day, more than 0." } }
+        repo.updateSettings { it.copy(extraTargets = t) }
+        message.value = "Saved"
+    }
+
     fun setWorkoutsPerWeek(n: Int) = launchSafely {
         require(n in 1..14) { "Choose between 1 and 14 workouts a week." }
         repo.updateSettings { it.copy(workoutsPerWeek = n) }
@@ -408,6 +425,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         require(source.isNotEmpty()) { "There is nothing to copy on that day." }
         repo.addEntries(Diary.copy(source, day.value, now(), toMeal))
         message.value = if (fromMeal == null) "Copied ${source.size} items" else "Copied ${fromMeal.title.lowercase()}"
+    }
+
+    /** "Same as yesterday" (0.7.0): copies what was eaten at [meal] the day before the day shown. */
+    fun sameAsYesterday(meal: Meal) = launchSafely {
+        val yesterday = day.value.minus(kotlinx.datetime.DatePeriod(days = 1))
+        val source = repo.entriesOnce(yesterday).filter { it.meal == meal && !it.planned }
+        require(source.isNotEmpty()) { "Nothing was logged at ${meal.title.lowercase()} the day before." }
+        repo.addEntries(Diary.copy(source, day.value, now(), meal))
+        message.value = "Added ${meal.title.lowercase()} from the day before"
+        checkFast()
     }
 
     // Saved meals.

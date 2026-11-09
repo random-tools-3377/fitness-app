@@ -58,6 +58,11 @@ data class FoodRow(
     val hidden: Boolean = false,
     /** Version 3 (0.3.0): the barcode of a typed-in food, so scanning finds it. */
     val barcode: String? = null,
+    /** Version 6 (0.7.0): fibre, sugar, saturated fat and salt in grams; null when not known. */
+    val fibre: Double? = null,
+    val sugar: Double? = null,
+    val satFat: Double? = null,
+    val salt: Double? = null,
 )
 
 @Entity(tableName = "entries", indices = [Index("day")])
@@ -79,6 +84,11 @@ data class EntryRow(
     val createdAt: Long,
     /** Version 4 (0.5.0): planned ahead, not eaten yet. */
     @androidx.room.ColumnInfo(defaultValue = "0") val planned: Boolean = false,
+    /** Version 6 (0.7.0): fibre, sugar, saturated fat and salt in grams; null when not known. */
+    val fibre: Double? = null,
+    val sugar: Double? = null,
+    val satFat: Double? = null,
+    val salt: Double? = null,
 )
 
 @Entity(tableName = "recipes")
@@ -139,6 +149,11 @@ data class SavedMealItemRow(
     val protein: Double,
     val carbs: Double,
     val fat: Double,
+    /** Version 6 (0.7.0): fibre, sugar, saturated fat and salt in grams; null when not known. */
+    val fibre: Double? = null,
+    val sugar: Double? = null,
+    val satFat: Double? = null,
+    val salt: Double? = null,
 )
 
 @Entity(tableName = "water", indices = [Index("day")])
@@ -537,9 +552,9 @@ interface FitnessDao {
         // Version 5 (0.6.0): fasting.
         FastRow::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
@@ -560,37 +575,40 @@ fun dayOf(n: Long): LocalDate = LocalDate.fromEpochDays(n.toInt())
 
 fun FoodRow.toCore() = Food(
     id = id, name = name, brand = brand, unit = BaseUnit.valueOf(unit),
-    per100 = Nutrients(kcal, protein, carbs, fat), portions = PortionText.decode(portions), hidden = hidden, barcode = barcode,
+    per100 = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt), portions = PortionText.decode(portions), hidden = hidden, barcode = barcode,
 )
 
 fun Food.toRow(createdAt: Long) = FoodRow(
     id = id, name = name, brand = brand, unit = unit.name,
     kcal = per100.kcal, protein = per100.protein, carbs = per100.carbs, fat = per100.fat,
+    fibre = per100.fibre, sugar = per100.sugar, satFat = per100.satFat, salt = per100.salt,
     portions = PortionText.encode(portions), createdAt = createdAt, hidden = hidden, barcode = barcode,
 )
 
 fun EntryRow.toCore() = DiaryEntry(
     id = id, day = dayOf(day), meal = Meal.valueOf(meal), foodId = foodId, builtInId = builtInId, name = name,
-    amount = Amount(quantity, portion), unit = BaseUnit.valueOf(unit), nutrients = Nutrients(kcal, protein, carbs, fat),
+    amount = Amount(quantity, portion), unit = BaseUnit.valueOf(unit), nutrients = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt),
     createdAt = createdAt, planned = planned,
 )
 
 fun DiaryEntry.toRow() = EntryRow(
     id = id, day = day.toDay(), meal = meal.name, foodId = foodId, builtInId = builtInId, name = name,
     quantity = amount.quantity, portion = amount.portion, unit = unit.name,
-    kcal = nutrients.kcal, protein = nutrients.protein, carbs = nutrients.carbs, fat = nutrients.fat, createdAt = createdAt,
+    kcal = nutrients.kcal, protein = nutrients.protein, carbs = nutrients.carbs, fat = nutrients.fat,
+    fibre = nutrients.fibre, sugar = nutrients.sugar, satFat = nutrients.satFat, salt = nutrients.salt, createdAt = createdAt,
     planned = planned,
 )
 
 fun SavedMealItemRow.toCore() = SavedMealItem(
     foodId = foodId, builtInId = builtInId, name = name, amount = Amount(quantity, portion), unit = BaseUnit.valueOf(unit),
-    nutrients = Nutrients(kcal, protein, carbs, fat),
+    nutrients = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt),
 )
 
 fun SavedMealItem.toRow(mealId: Long, position: Int) = SavedMealItemRow(
     mealId = mealId, position = position, foodId = foodId, builtInId = builtInId, name = name,
     quantity = amount.quantity, portion = amount.portion, unit = unit.name,
     kcal = nutrients.kcal, protein = nutrients.protein, carbs = nutrients.carbs, fat = nutrients.fat,
+    fibre = nutrients.fibre, sugar = nutrients.sugar, satFat = nutrients.satFat, salt = nutrients.salt,
 )
 
 fun savedMealsOf(meals: List<SavedMealRow>, items: List<SavedMealItemRow>): List<SavedMeal> {

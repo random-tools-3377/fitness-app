@@ -17,6 +17,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Only for Tesseract4Android (Apache-2.0), the on-phone text recognition for reading labels.
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.adaptech-cz.Tesseract4Android") }
+        }
     }
 }
 

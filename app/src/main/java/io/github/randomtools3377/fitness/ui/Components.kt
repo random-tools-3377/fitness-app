@@ -107,6 +107,14 @@ fun ConfirmDialog(
 fun macroLine(n: Nutrients): String =
     "Protein ${Units.grams(n.protein)} · Carbs ${Units.grams(n.carbs)} · Fat ${Units.grams(n.fat)}"
 
+/** "Fibre 3 g · Sugar 1 g · Saturates 0.5 g · Salt 0.2 g", with only what is known; "" if nothing is. */
+fun extrasLine(n: Nutrients): String = listOfNotNull(
+    n.fibre?.let { "Fibre ${io.github.randomtools3377.fitness.core.formatAmount(Math.round(it * 10) / 10.0)} g" },
+    n.sugar?.let { "Sugar ${io.github.randomtools3377.fitness.core.formatAmount(Math.round(it * 10) / 10.0)} g" },
+    n.satFat?.let { "Saturates ${io.github.randomtools3377.fitness.core.formatAmount(Math.round(it * 10) / 10.0)} g" },
+    n.salt?.let { "Salt ${io.github.randomtools3377.fitness.core.formatAmount(Math.round(it * 100) / 100.0)} g" },
+).joinToString(" · ")
+
 fun energy(kcal: Double, u: UnitSettings): String = Units.energy(kcal, u.energy)
 
 fun energyUnit(u: UnitSettings): String = u.energy.short

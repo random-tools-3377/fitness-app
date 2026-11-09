@@ -117,7 +117,7 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
             }
         }
 
-        item { SummaryCard(totals.total, burned, settings.burnedHalf, settings.targetKcal, settings.macros.grams(settings.targetKcal ?: 0), units, open) }
+        item { SummaryCard(totals.total, burned, settings.burnedHalf, settings.targetKcal, settings.macros.grams(settings.targetKcal ?: 0), settings.extraTargets, units, open) }
 
         if (dayWorkouts.isNotEmpty()) {
             item {
@@ -168,6 +168,7 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
                     units = units,
                     add = { open(Route.AddFood(meal)) },
                     copy = { open(Route.Copy(meal)) },
+                    sameAsYesterday = { vm.sameAsYesterday(meal) },
                     save = { savingMeal = meal },
                     edit = { editing = it },
                     eat = { vm.eatPlanned(it) },
@@ -203,7 +204,16 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
 }
 
 @Composable
-private fun SummaryCard(eaten: Nutrients, burned: Double, half: Boolean, targetKcal: Int?, macroTargets: Nutrients, units: UnitSettings, open: (Route) -> Unit) {
+private fun SummaryCard(
+    eaten: Nutrients,
+    burned: Double,
+    half: Boolean,
+    targetKcal: Int?,
+    macroTargets: Nutrients,
+    extraTargets: io.github.randomtools3377.fitness.core.ExtraTargets,
+    units: UnitSettings,
+    open: (Route) -> Unit,
+) {
     Section("Calories") {
         LabelValue("Eaten", energy(eaten.kcal, units), tag = "day-kcal")
         if (burned > 0) LabelValue(if (half) "Burned in workouts (half)" else "Burned in workouts", energy(burned, units), tag = "day-burned")
@@ -224,6 +234,27 @@ private fun SummaryCard(eaten: Nutrients, burned: Double, half: Boolean, targetK
         MacroRow("Protein", eaten.protein, if (targetKcal != null) macroTargets.protein else null)
         MacroRow("Carbs", eaten.carbs, if (targetKcal != null) macroTargets.carbs else null)
         MacroRow("Fat", eaten.fat, if (targetKcal != null) macroTargets.fat else null)
+        // Fibre, sugar, saturates and salt (0.7.0): shown when a food gave them or a target is set.
+        ExtraRow("Fibre", eaten.fibre, extraTargets.fibre, atLeast = true)
+        ExtraRow("Sugar", eaten.sugar, extraTargets.sugar, atLeast = false)
+        ExtraRow("Saturates", eaten.satFat, extraTargets.satFat, atLeast = false)
+        ExtraRow("Salt", eaten.salt, extraTargets.salt, atLeast = false)
+    }
+}
+
+@Composable
+private fun ExtraRow(name: String, eaten: Double?, target: Double?, atLeast: Boolean) {
+    if (eaten == null && target == null) return
+    val g = eaten ?: 0.0
+    val shown = if (name == "Salt") "${io.github.randomtools3377.fitness.core.formatAmount(Math.round(g * 100) / 100.0)} g" else Units.grams(g)
+    val text = when {
+        target == null -> shown
+        atLeast -> "$shown of at least ${Units.grams(target)}"
+        else -> "$shown of at most ${Units.grams(target)}"
+    }
+    LabelValue(name, text, tag = "day-${name.lowercase()}")
+    if (target != null && !atLeast && g > target) {
+        Text("Over the day's limit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
 }
 
@@ -246,6 +277,7 @@ private fun MealCard(
     units: UnitSettings,
     add: () -> Unit,
     copy: () -> Unit,
+    sameAsYesterday: () -> Unit,
     save: () -> Unit,
     edit: (DiaryEntry) -> Unit,
     eat: (DiaryEntry) -> Unit,
@@ -279,6 +311,11 @@ private fun MealCard(
                     Icon(Icons.Filled.MoreVert, contentDescription = "More")
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Same as yesterday") },
+                        onClick = { menu = false; sameAsYesterday() },
+                        modifier = Modifier.testTag("same-as-yesterday-menu:${meal.name}"),
+                    )
                     DropdownMenuItem(
                         text = { Text("Copy from another day") },
                         onClick = { menu = false; copy() },
@@ -321,6 +358,9 @@ private fun MealCard(
         }
         if (entries.any { !it.planned }) {
             Text(macroLine(total), style = MaterialTheme.typography.bodySmall)
+            extrasLine(total).takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        } else {
+            TextButton(onClick = sameAsYesterday, modifier = Modifier.testTag("same-as-yesterday:${meal.name}")) { Text("Same as yesterday") }
         }
     }
 }

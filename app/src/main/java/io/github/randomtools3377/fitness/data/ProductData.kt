@@ -32,6 +32,11 @@ data class ProductRow(
     val fat: Double,
     val servingGrams: Double?,
     val servingLabel: String,
+    /** Version 6 (0.7.0): fibre, sugar, saturated fat and salt in grams, when the file has them. */
+    val fibre: Double? = null,
+    val sugar: Double? = null,
+    val satFat: Double? = null,
+    val salt: Double? = null,
 )
 
 /** A country file the user added. */
@@ -66,7 +71,7 @@ interface ProductDao {
     suspend fun deleteCountry(name: String)
 }
 
-fun ProductRow.toCore() = Product(barcode, name, brand, Nutrients(kcal, protein, carbs, fat), servingGrams, servingLabel)
+fun ProductRow.toCore() = Product(barcode, name, brand, Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt), servingGrams, servingLabel)
 
 /** Reading a country file into the database, a few thousand products at a time. */
 object CountryFiles {
@@ -105,7 +110,7 @@ object CountryFiles {
                     val p = Products.parseLine(line) ?: continue
                     batch += ProductRow(
                         p.barcode, country, p.name, p.brand, p.per100.kcal, p.per100.protein, p.per100.carbs, p.per100.fat,
-                        p.servingGrams, p.servingLabel,
+                        p.servingGrams, p.servingLabel, p.per100.fibre, p.per100.sugar, p.per100.satFat, p.per100.salt,
                     )
                     count++
                     if (batch.size >= BATCH) flush()

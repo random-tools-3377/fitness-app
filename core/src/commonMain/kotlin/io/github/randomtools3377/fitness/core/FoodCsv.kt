@@ -26,18 +26,24 @@ object FoodCsv {
 
     /** A file to fill in, with two examples. */
     val TEMPLATE: String = listOf(
-        "name,brand,per,serving size,serving name,kcal,protein,carbs,fat,portions",
-        "Rolled oats,Mill & Co,100 g,,,372,13.5,58.7,7,1 bowl=40",
-        "Protein bar,Snack Co,serving,45,1 bar,190,20,15,6,",
-        "Orange juice,,100 ml,,,45,0.7,10,0.2,1 glass=200",
+        "name,brand,per,serving size,serving name,kcal,protein,carbs,fat,portions,fibre,sugar,saturated fat,salt",
+        "Rolled oats,Mill & Co,100 g,,,372,13.5,58.7,7,1 bowl=40,,,,",
+        "Protein bar,Snack Co,serving,45,1 bar,190,20,15,6,,,,,",
+        "Orange juice,,100 ml,,,45,0.7,10,0.2,1 glass=200,,,,",
     ).joinToString("\n") + "\n"
 
-    private enum class Col { NAME, BRAND, PER, SERVING_SIZE, SERVING_NAME, KCAL, KJ, PROTEIN, CARBS, FAT, PORTIONS }
+    private enum class Col { NAME, BRAND, PER, SERVING_SIZE, SERVING_NAME, KCAL, KJ, PROTEIN, CARBS, FAT, PORTIONS, FIBRE, SUGAR, SAT_FAT, SALT, SODIUM }
 
     private fun column(header: String): Col? {
         val h = header.trim().lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
         return when {
             h == "name" || h == "food" || h == "food name" || h == "description" -> Col.NAME
+            // Before carbs and fat, as "carbs of which sugars" and "fat saturates" start the same way.
+            "sugar" in h -> Col.SUGAR
+            "saturate" in h || h == "sat fat" -> Col.SAT_FAT
+            h.startsWith("fibre") || h.startsWith("fiber") -> Col.FIBRE
+            h == "salt" || h.startsWith("salt ") -> Col.SALT
+            h.startsWith("sodium") -> Col.SODIUM
             h == "brand" || h == "maker" -> Col.BRAND
             h == "per" || h == "basis" || h == "values per" || h == "per 100" -> Col.PER
             h.startsWith("serving size") || h == "serving g" || h == "serving ml" || h == "serving" -> Col.SERVING_SIZE
@@ -123,7 +129,12 @@ object FoodCsv {
                 }
                 else -> { problems += Problem(lineNo, "$name: \"per\" should be 100 g, 100 ml or serving."); continue }
             }
-            val typed = Nutrients(energy, num(Col.PROTEIN) ?: 0.0, num(Col.CARBS) ?: 0.0, num(Col.FAT) ?: 0.0)
+            val typed = Nutrients(
+                energy, num(Col.PROTEIN) ?: 0.0, num(Col.CARBS) ?: 0.0, num(Col.FAT) ?: 0.0,
+                fibre = num(Col.FIBRE), sugar = num(Col.SUGAR), satFat = num(Col.SAT_FAT),
+                // Sodium in a spreadsheet is taken to be in mg, as US labels give it.
+                salt = num(Col.SALT) ?: num(Col.SODIUM)?.let { Nutrients.saltFromSodiumMg(it) },
+            )
             val per100 = if (servingSize == null) typed else Label.per100(typed, servingSize)
             val label = Label.problems(name, per100, unit)
             if (label.isNotEmpty()) { problems += Problem(lineNo, "$name: ${label.first()}"); continue }

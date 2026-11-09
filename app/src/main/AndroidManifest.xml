@@ -95,5 +95,16 @@
                 android:name="androidx.emoji2.text.EmojiCompatInitializer"
                 tools:node="remove" />
         </provider>
+
+        <!-- A photo of a food label (0.7.0), taken by the camera app into the app's own cache. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

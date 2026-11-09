@@ -197,3 +197,15 @@ data class WaterSettings(
     val glassMl: Int = 250,
     val bottleMl: Int = 500,
 )
+
+/**
+ * Daily targets in grams for fibre (at least) and sugar, saturated fat and salt (at most), each
+ * off (null) until the user sets it (0.7.0).
+ */
+@kotlinx.serialization.Serializable
+data class ExtraTargets(
+    val fibre: Double? = null,
+    val sugar: Double? = null,
+    val satFat: Double? = null,
+    val salt: Double? = null,
+)

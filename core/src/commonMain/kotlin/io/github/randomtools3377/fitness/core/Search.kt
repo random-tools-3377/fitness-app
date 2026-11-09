@@ -17,10 +17,14 @@ object FoodSearch {
         return usage.count / (1.0 + daysAgo / 7.0)
     }
 
-    /** The foods that have been used, most recent and most used first. */
-    fun recent(foods: List<Food>, usages: Map<String, Usage>, now: Long): List<Food> =
-        foods.filter { it.key in usages }
-            .sortedWith(compareByDescending<Food> { usageScore(usages.getValue(it.key), now) }.thenBy { it.name.lowercase() })
+    /** The favourites (0.7.0) and then the foods that have been used, most recent and most used first. */
+    fun recent(foods: List<Food>, usages: Map<String, Usage>, now: Long, favourites: Set<String> = emptySet()): List<Food> =
+        foods.filter { it.key in usages || it.key in favourites }
+            .sortedWith(
+                compareByDescending<Food> { it.key in favourites }
+                    .thenByDescending { usages[it.key]?.let { u -> usageScore(u, now) } ?: 0.0 }
+                    .thenBy { it.name.lowercase() },
+            )
 
     /** Lowercase words, with accents and punctuation taken off. */
     fun words(text: String): List<String> =
@@ -44,10 +48,17 @@ object FoodSearch {
     }
 
     /**
-     * Foods matching [query], best first: foods used before (most recent and most used first),
+     * Foods matching [query], best first: the user's favourites (0.7.0), then foods used before (most recent and most used first),
      * then the user's own, then names that start with what was typed, then shorter names.
      */
-    fun search(query: String, foods: List<Food>, usages: Map<String, Usage>, now: Long, limit: Int = 100): List<Food> {
+    fun search(
+        query: String,
+        foods: List<Food>,
+        usages: Map<String, Usage>,
+        now: Long,
+        limit: Int = 100,
+        favourites: Set<String> = emptySet(),
+    ): List<Food> {
         val q = words(query)
         if (q.isEmpty()) return emptyList()
         val first = q.first()
@@ -56,6 +67,7 @@ object FoodSearch {
             .map { food ->
                 val nameWords = words(food.name)
                 var score = 0.0
+                if (food.key in favourites) score += 10_000.0
                 usages[food.key]?.let { score += 1000.0 + 100.0 * usageScore(it, now) }
                 if (food.builtInId == null) score += 500.0
                 if (nameWords.firstOrNull()?.startsWith(first) == true) score += 50.0
@@ -82,6 +94,9 @@ object FoodSearch {
 
 /** Reads the bundled food list (foods.tsv, made by tools/build-food-list.py). */
 object BuiltInFoods {
+    /** An optional number column: empty or missing is unknown. */
+    private fun opt(f: List<String>, i: Int): Double? = f.getOrNull(i)?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+
     fun parse(text: String): List<Food> {
         val out = ArrayList<Food>(16_000)
         for (line in text.lineSequence()) {
@@ -100,7 +115,10 @@ object BuiltInFoods {
                 builtInId = f[0],
                 name = f[1],
                 unit = BaseUnit.GRAM,
-                per100 = Nutrients(f[2].toDouble(), f[3].toDouble(), f[4].toDouble(), f[5].toDouble()),
+                per100 = Nutrients(
+                    f[2].toDouble(), f[3].toDouble(), f[4].toDouble(), f[5].toDouble(),
+                    fibre = opt(f, 7), sugar = opt(f, 8), satFat = opt(f, 9), salt = opt(f, 10),
+                ),
                 portions = portions,
             )
         }

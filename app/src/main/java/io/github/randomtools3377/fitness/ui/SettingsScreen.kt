@@ -91,6 +91,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
 
         MacroSection(settings.macros, settings.targetKcal ?: 2000, onSave = vm::setMacros)
         MealSplitSection(vm, settings)
+        ExtraTargetsSection(vm, settings)
         WaterSection(settings.water, units.volume, onSave = vm::setWater)
 
         Section("Workouts") {
@@ -161,6 +162,11 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
             )
             Text(
                 "The calorie target is an estimate (the Mifflin–St Jeor formula). It is not medical advice.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Reading labels uses Tesseract OCR and its English data (tessdata_fast), through Tesseract4Android, " +
+                    "all under the Apache License 2.0. Barcode scanning uses ZXing, under the Apache License 2.0.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

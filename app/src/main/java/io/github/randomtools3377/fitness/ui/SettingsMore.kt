@@ -266,3 +266,35 @@ fun MealSplitSection(vm: MainViewModel, settings: AppSettings) {
         }
     }
 }
+
+/** Daily targets for fibre (at least) and sugar, saturates and salt (at most), each optional (0.7.0). */
+@Composable
+fun ExtraTargetsSection(vm: MainViewModel, settings: AppSettings) {
+    val t = settings.extraTargets
+    fun text(x: Double?) = x?.let { io.github.randomtools3377.fitness.core.formatAmount(it) }.orEmpty()
+    var fibre by remember(t) { mutableStateOf(text(t.fibre)) }
+    var sugar by remember(t) { mutableStateOf(text(t.sugar)) }
+    var satFat by remember(t) { mutableStateOf(text(t.satFat)) }
+    var salt by remember(t) { mutableStateOf(text(t.salt)) }
+    Section("Fibre, sugar, saturates and salt") {
+        Text(
+            "Shown on the day when a food gives them. Daily targets are optional: leave a box empty for none.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(fibre, { fibre = it }, "Fibre, at least", "target:fibre", Modifier.weight(1f), suffix = "g")
+            NumberField(sugar, { sugar = it }, "Sugar, at most", "target:sugar", Modifier.weight(1f), suffix = "g")
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(satFat, { satFat = it }, "Saturates, at most", "target:satfat", Modifier.weight(1f), suffix = "g")
+            NumberField(salt, { salt = it }, "Salt, at most", "target:salt", Modifier.weight(1f), suffix = "g")
+        }
+        OutlinedButton(
+            onClick = {
+                fun parse(s: String) = io.github.randomtools3377.fitness.core.Units.parse(s)
+                vm.setExtraTargets(io.github.randomtools3377.fitness.core.ExtraTargets(parse(fibre), parse(sugar), parse(satFat), parse(salt)))
+            },
+            modifier = Modifier.testTag("save-extra-targets"),
+        ) { Text("Save") }
+    }
+}

@@ -23,6 +23,10 @@ from the tables, rounded to one decimal. A value a table gives as "traces", as b
 Each line of foods.tsv is:
 
     id <TAB> name <TAB> kcal <TAB> protein <TAB> carbs <TAB> fat <TAB> portions
+       <TAB> fibre <TAB> sugar <TAB> saturated fat <TAB> salt
+
+The last four, added for 0.7.0, are empty when the table doesn't give them. Salt is worked out
+from USDA's sodium (mg × 2.5 ÷ 1000), the way EU labels count it; CIQUAL gives salt itself.
 
 Nutrients are per 100 g. The id is the source letter and the food's id in that table: F, S or N
 and the FoodData Central id, or C and the CIQUAL code. Portions are "label=grams" pairs separated
@@ -82,6 +86,9 @@ CARBS_BY_DIFFERENCE = 1005  # includes fibre
 CARBS_BY_SUMMATION = 1050  # sugars and starch, no fibre
 FIBRE = 1079  # Fiber, total dietary
 FAT = [1004, 1085]  # Total lipid (fat); Total fat (NLEA)
+SUGARS = [2000, 1063]  # Sugars, total including NLEA; Sugars, Total NLEA
+SAT_FAT = [1258]  # Fatty acids, total saturated
+SODIUM_MG = [1093]  # Sodium, Na (mg); salt is sodium x 2.5
 
 MAX_PORTIONS = 8
 
@@ -211,6 +218,17 @@ def first(amounts, ids):
     return None
 
 
+def optional(x, places=1):
+    """An extra nutrient: its number, or "" when the table doesn't give it. Salt keeps two decimals."""
+    if x is None:
+        return ""
+    return number(x) if places == 1 else ("%.2f" % x).rstrip("0").rstrip(".")
+
+
+def salt_from_sodium(mg):
+    return None if mg is None else mg * 2.5 / 1000.0
+
+
 def usda_carbs(amounts):
     """Carbs without fibre, the way EU labels give them."""
     if CARBS_BY_DIFFERENCE in amounts:
@@ -281,6 +299,10 @@ def usda_row(food, letter):
         number(usda_carbs(amounts)),
         number(first(amounts, FAT) or 0.0),
         portions(food),
+        optional(amounts.get(FIBRE)),
+        optional(first(amounts, SUGARS)),
+        optional(first(amounts, SAT_FAT)),
+        optional(salt_from_sodium(first(amounts, SODIUM_MG)), 2),
     ]
 
 
@@ -461,10 +483,15 @@ def build_ciqual(args, work):
     protein = find_const(consts, r"^Protein, N x 6\.25", r"^Protein")
     carbs = find_const(consts, r"^Carbohydrate \(g", r"^Carbohydrate")
     fat = find_const(consts, r"^Fat \(g", r"^Fat")
-    for label, (code, name) in [("kcal", kcal), ("kJ", kj), ("protein", protein), ("carbs", carbs), ("fat", fat)]:
+    fibre = find_const(consts, r"^Fibres", r"^Fib")
+    sugars = find_const(consts, r"^Sugars \(g", r"^Sugars")
+    sat_fat = find_const(consts, r"^FA saturated", r"saturated")
+    salt = find_const(consts, r"^Salt", r"^Sodium chloride")
+    extras = [("fibre", fibre), ("sugars", sugars), ("saturated fat", sat_fat), ("salt", salt)]
+    for label, (code, name) in [("kcal", kcal), ("kJ", kj), ("protein", protein), ("carbs", carbs), ("fat", fat)] + extras:
         print("CIQUAL %s: %s %s" % (label, code, name))
 
-    wanted = {kcal[0], kj[0], protein[0], carbs[0], fat[0]}
+    wanted = {kcal[0], kj[0], protein[0], carbs[0], fat[0], fibre[0], sugars[0], sat_fat[0], salt[0]}
     values = {}
     for c in compo:
         code = c.get("const_code")
@@ -488,6 +515,10 @@ def build_ciqual(args, work):
             number(v.get(carbs[0]) or 0.0),
             number(v.get(fat[0]) or 0.0),
             "",
+            optional(v.get(fibre[0])),
+            optional(v.get(sugars[0])),
+            optional(v.get(sat_fat[0])),
+            optional(v.get(salt[0]), 2),
         ])
     name = re.sub(r"^ciqual-(\d+-)?", "", os.path.basename(path))
     print("%s (%s): %d foods, %d kept" % (CIQUAL_TITLE, name, len(alim), len(rows)))
@@ -508,7 +539,7 @@ CIQUAL
   Anses. Ciqual French food composition table. https://ciqual.anses.fr
   Under the Licence Ouverte / Etalab Open Licence 2.0
   (https://www.etalab.gouv.fr/licence-ouverte-open-licence/). Only the English food names and
-  the energy, protein, carbohydrate and fat values are used. This app is not endorsed by Anses.
+  the energy, protein, carbohydrate, fat, fibre, sugars, saturated fat and salt values are used. This app is not endorsed by Anses.
 """
 
 NOTICE_END = """
@@ -548,7 +579,8 @@ def main():
         f.write("# Made by tools/build-food-list.py. See foods-NOTICE.txt.\n")
         for title, name, kept in used:
             f.write("# %s: %s, %d foods\n" % (title, name, kept))
-        f.write("# id\tname\tkcal\tprotein\tcarbs\tfat\tportions   (per 100 g; carbs without fibre; portions label=grams)\n")
+        f.write("# id\tname\tkcal\tprotein\tcarbs\tfat\tportions\tfibre\tsugar\tsaturates\tsalt"
+                "   (per 100 g; carbs without fibre; portions label=grams; an empty extra is not known)\n")
         for row in rows:
             f.write("\t".join(row) + "\n")
     print(len(rows), "foods written to", target)

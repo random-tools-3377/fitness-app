@@ -29,6 +29,10 @@ data class AppSettings(
     val mealSplit: MealSplit = MealSplit(),
     /** The fasting plan last chosen, in hours (0.6.0). */
     val fastHours: Double = 16.0,
+    /** Foods starred by the user, by key ("b:S171705", "u:12"), first in the search (0.7.0). */
+    val favourites: Set<String> = emptySet(),
+    /** Daily targets for fibre, sugar, saturated fat and salt; off until set (0.7.0). */
+    val extraTargets: ExtraTargets = ExtraTargets(),
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

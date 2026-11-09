@@ -84,6 +84,8 @@ fun AddFoodScreen(
     val saved by vm.savedMeals.collectAsState()
     val units by vm.units.collectAsState()
     val european by vm.hasEuropeanFoods.collectAsState()
+    val appSettings by vm.settings.collectAsState()
+    val favourites = appSettings.favourites
     var picked by remember { mutableStateOf<Food?>(null) }
     var quick by remember { mutableStateOf(false) }
     var notFound by remember { mutableStateOf<String?>(null) }
@@ -146,12 +148,12 @@ fun AddFoodScreen(
                 }
                 if (recent.isNotEmpty()) {
                     item { Heading("Recent and frequent") }
-                    items(recent, key = { "recent:${it.key}" }) { f -> FoodRow(f, units) { picked = f } }
+                    items(recent, key = { "recent:${it.key}" }) { f -> FoodRow(f, units, f.key in favourites) { picked = f } }
                 }
                 val others = mine.filter { f -> recent.none { it.key == f.key } }
                 if (others.isNotEmpty()) {
                     item { Heading("Your foods") }
-                    items(others, key = { "mine:${it.key}" }) { f -> FoodRow(f, units) { picked = f } }
+                    items(others, key = { "mine:${it.key}" }) { f -> FoodRow(f, units, f.key in favourites) { picked = f } }
                 }
                 item {
                     Text(
@@ -170,7 +172,7 @@ fun AddFoodScreen(
                         )
                     }
                 }
-                items(results, key = { "result:${it.key}" }) { f -> FoodRow(f, units) { picked = f } }
+                items(results, key = { "result:${it.key}" }) { f -> FoodRow(f, units, f.key in favourites) { picked = f } }
             }
             item {
                 Text(
@@ -192,6 +194,8 @@ fun AddFoodScreen(
             confirmText = if (mode == AddMode.PLAN) "Plan" else "Add",
             onConfirm = { a -> add(f, a); picked = null; back() },
             onDismiss = { picked = null },
+            favourite = f.key in favourites,
+            onFavourite = { on -> vm.setFavourite(f, on) },
         )
     }
     notFound?.let { code ->
@@ -219,11 +223,11 @@ private fun Heading(text: String) {
 }
 
 @Composable
-fun FoodRow(food: Food, units: UnitSettings, onClick: () -> Unit) {
+fun FoodRow(food: Food, units: UnitSettings, favourite: Boolean = false, onClick: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp).testTag("food:${food.name}"),
     ) {
-        Text(food.displayName(), style = MaterialTheme.typography.bodyLarge)
+        Text((if (favourite) "★ " else "") + food.displayName(), style = MaterialTheme.typography.bodyLarge)
         Text(
             "${energy(food.per100.kcal, units)} per 100 ${food.unit.short} · ${sourceOf(food)}",
             style = MaterialTheme.typography.bodySmall,
@@ -263,6 +267,8 @@ fun AmountDialog(
     onDelete: (() -> Unit)? = null,
     onMove: ((Meal) -> Unit)? = null,
     current: Meal? = null,
+    favourite: Boolean? = null,
+    onFavourite: ((Boolean) -> Unit)? = null,
 ) {
     val baseLabel = food.unit.short
     var portion by remember(food.key) { mutableStateOf(initial?.portion ?: food.portions.firstOrNull()?.label) }
@@ -303,6 +309,12 @@ fun AmountDialog(
                     val n = food.nutrientsFor(amount)
                     Text(energy(n.kcal, units), style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("amount-kcal"))
                     Text(macroLine(n), style = MaterialTheme.typography.bodySmall)
+                    extrasLine(n).takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
+                if (favourite != null && onFavourite != null) {
+                    TextButton(onClick = { onFavourite(!favourite) }, modifier = Modifier.testTag("favourite")) {
+                        Text(if (favourite) "★ A favourite: tap to unstar" else "☆ Make it a favourite")
+                    }
                 }
                 if (onMove != null && current != null) {
                     Text("Meal", style = MaterialTheme.typography.labelLarge)
@@ -334,6 +346,8 @@ fun QuickAddDialog(
     onDelete: (() -> Unit)? = null,
     onMove: ((Meal) -> Unit)? = null,
     current: Meal? = null,
+    favourite: Boolean? = null,
+    onFavourite: ((Boolean) -> Unit)? = null,
 ) {
     var text by remember {
         mutableStateOf(initialKcal?.let { formatAmount(Units.kcalToShown(it, units.energy)) } ?: "")

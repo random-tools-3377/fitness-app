@@ -57,6 +57,8 @@ import io.github.randomtools3377.fitness.core.SavedMeal
 import io.github.randomtools3377.fitness.core.Units
 import io.github.randomtools3377.fitness.core.formatAmount
 import kotlinx.coroutines.launch
+import io.github.randomtools3377.fitness.core.LabelText
+import io.github.randomtools3377.fitness.labels.LabelOcr
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
@@ -89,6 +91,11 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
     var proteinText by remember { mutableStateOf("") }
     var carbsText by remember { mutableStateOf("") }
     var fatText by remember { mutableStateOf("") }
+    var fibreText by remember { mutableStateOf("") }
+    var sugarText by remember { mutableStateOf("") }
+    var satFatText by remember { mutableStateOf("") }
+    var saltText by remember { mutableStateOf("") }
+    var reading by remember { mutableStateOf<String?>(null) }
     val portions = remember { mutableStateListOf<PortionInput>() }
     var problems by remember { mutableStateOf<List<String>>(emptyList()) }
     var code by remember { mutableStateOf(barcode) }
@@ -103,6 +110,10 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
                 proteinText = formatAmount(f.per100.protein)
                 carbsText = formatAmount(f.per100.carbs)
                 fatText = formatAmount(f.per100.fat)
+                fibreText = f.per100.fibre?.let { formatAmount(it) }.orEmpty()
+                sugarText = f.per100.sugar?.let { formatAmount(it) }.orEmpty()
+                satFatText = f.per100.satFat?.let { formatAmount(it) }.orEmpty()
+                saltText = f.per100.salt?.let { formatAmount(it) }.orEmpty()
                 code = f.barcode
                 portions.clear()
                 f.portions.forEach { portions.add(PortionInput(it.label, formatAmount(it.amount))) }
@@ -118,6 +129,10 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
             protein = Units.parse(proteinText) ?: 0.0,
             carbs = Units.parse(carbsText) ?: 0.0,
             fat = Units.parse(fatText) ?: 0.0,
+            fibre = Units.parse(fibreText),
+            sugar = Units.parse(sugarText),
+            satFat = Units.parse(satFatText),
+            salt = Units.parse(saltText),
         )
         val out = mutableListOf<String>()
         if (energy == null) out += "Type the energy (calories) from the label."
@@ -141,6 +156,55 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
         scope.launch { saved(vm.saveFood(food)) }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    fun readLabel(uri: android.net.Uri) {
+        reading = "Reading the label…"
+        scope.launch {
+            val text = runCatching { LabelOcr.read(context, uri) }.getOrDefault("")
+            LabelOcr.clear(context)
+            val r = LabelText.read(text)
+            if (r == null) {
+                reading = "No numbers could be read. Try again straight on, close up and in good light, or type them in."
+                return@launch
+            }
+            if (r.millilitres) unit = BaseUnit.MILLILITRE
+            if (r.perServing && r.servingSize != null) {
+                basis = Basis.PER_SERVING
+                servingSize = formatAmount(r.servingSize)
+            } else {
+                basis = Basis.PER_100
+            }
+            r.kcal?.let { energyText = formatAmount(Math.round(Units.kcalToShown(it, energyUnit) * 10) / 10.0) }
+            r.protein?.let { proteinText = formatAmount(it) }
+            r.carbs?.let { carbsText = formatAmount(it) }
+            r.fat?.let { fatText = formatAmount(it) }
+            r.fibre?.let { fibreText = formatAmount(it) }
+            r.sugar?.let { sugarText = formatAmount(it) }
+            r.satFat?.let { satFatText = formatAmount(it) }
+            r.salt?.let { saltText = formatAmount(it) }
+            reading = buildString {
+                append("Read ${r.found} of 8 numbers")
+                append(if (r.perServing && r.servingSize != null) ", per serving of ${formatAmount(r.servingSize)} ${unit.short}." else ", per 100 ${unit.short}.")
+                if (r.fibreTakenOff) append(" The label's carbs included fibre, so the fibre was taken off.")
+                append(" Check each one against the label before saving.")
+            }
+        }
+    }
+    var photoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = photoUri
+        if (ok && uri != null) readLabel(uri) else reading = null
+    }
+    fun startCamera() {
+        val uri = LabelOcr.newPhotoUri(context)
+        photoUri = uri
+        runCatching { takePhoto.launch(uri) }.onFailure { reading = "No camera app was found. Choose a photo instead." }
+    }
+    val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startCamera() else reading = "The camera wasn't allowed. Choose a photo of the label instead."
+    }
+    val choosePhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) readLabel(uri) }
+
     Column(modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text(if (editId == null) "A food from its label" else "Change food") },
@@ -155,6 +219,18 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             code?.let { Text("Barcode $it: scanning it finds this food from now on.", style = MaterialTheme.typography.bodySmall) }
+            Text("Read the numbers from a photo of the label", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    val granted = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
+                        android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (granted) startCamera() else askCamera.launch(android.Manifest.permission.CAMERA)
+                }, modifier = Modifier.testTag("label-photo")) { Text("Take a photo") }
+                OutlinedButton(onClick = {
+                    choosePhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }, modifier = Modifier.testTag("label-choose")) { Text("Choose a photo") }
+            }
+            reading?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("label-reading")) }
             TextInput(name, { name = it }, "Name", "field:name")
             TextInput(brand, { brand = it }, "Brand (optional)", "field:brand")
             Text("Measured in", style = MaterialTheme.typography.labelLarge)
@@ -187,6 +263,16 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
                 style = MaterialTheme.typography.bodySmall,
             )
             NumberField(fatText, { fatText = it }, "Fat", "field:fat", Modifier.fillMaxWidth(), suffix = "g")
+            Text("Also on the label (optional)", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(satFatText, { satFatText = it }, "of which saturates", "field:satfat", Modifier.weight(1f), suffix = "g")
+                NumberField(sugarText, { sugarText = it }, "of which sugars", "field:sugar", Modifier.weight(1f), suffix = "g")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(fibreText, { fibreText = it }, "Fibre", "field:fibre", Modifier.weight(1f), suffix = "g")
+                NumberField(saltText, { saltText = it }, "Salt", "field:salt", Modifier.weight(1f), suffix = "g")
+            }
+            Text("On a US label, salt is sodium (mg) × 2.5 ÷ 1000.", style = MaterialTheme.typography.bodySmall)
 
             Text("Its own portions (optional), like \"1 slice\" of 30 g", style = MaterialTheme.typography.labelLarge)
             portions.forEachIndexed { i, p ->
