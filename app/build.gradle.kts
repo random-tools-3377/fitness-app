@@ -62,6 +62,11 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // ONNX Runtime (better label reading, 0.16.0) only for ARM phones, to keep the app smaller.
+        // On an x86 device the optional reader can't load, and labels are read with Tesseract.
+        jniLibs {
+            excludes += setOf("lib/x86/libonnxruntime*.so", "lib/x86_64/libonnxruntime*.so")
+        }
     }
 }
 
