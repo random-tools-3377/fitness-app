@@ -215,6 +215,19 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     val plates: StateFlow<io.github.randomtools3377.fitness.core.PlateSettings> = repo.settings.map { it.plates }
         .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.randomtools3377.fitness.core.PlateSettings())
 
+    /** The user's own cues for each exercise (0.13.0). */
+    val notes: StateFlow<Map<String, String>> = repo.settings.map { it.exerciseNotes }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    fun setNote(key: String, text: String) = viewModelScope.launch {
+        repo.updateSettings { s -> s.copy(exerciseNotes = if (text.isBlank()) s.exerciseNotes - key else s.exerciseNotes + (key to text.trim())) }
+    }
+
+    /** The interval timer's plan (0.13.0). */
+    val intervalPlan: StateFlow<io.github.randomtools3377.fitness.core.IntervalPlan> = repo.settings.map { it.intervals }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.randomtools3377.fitness.core.IntervalPlan.TABATA)
+
+    fun setIntervalPlan(p: io.github.randomtools3377.fitness.core.IntervalPlan) = viewModelScope.launch { repo.updateSettings { it.copy(intervals = p) } }
+
     fun setProgramme(p: Map<Int, Long>) = viewModelScope.launch { repo.updateSettings { it.copy(programme = p) } }
 
 
