@@ -231,6 +231,12 @@ Build order **(default)**, each step a Release the owner can try:
 5. Recipes, planning meals ahead and the shopping list. (0.5.0)
 6. A target for each meal, and the fasting timer. (0.6.0)
 
+## Layout (default)
+
+- Five tabs: Diary, Foods (your foods, saved meals, country files), Workouts, Plan (meals ahead,
+  shopping list, recipes, fasting) and Progress (stats and streaks, weight). Settings opens from
+  the gear button at the top of the diary.
+
 ## Not decided yet
 
 - A home-screen widget; reading steps from the phone (Health Connect, which works offline).

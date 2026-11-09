@@ -11,6 +11,12 @@ Open the [Releases page](../../releases) in the phone's browser, download the ne
 and allow installing from the browser if Android asks. Each new version installs over the last one
 and keeps the data.
 
+## Barcode scanning
+
+Scanning works offline from a file of packaged products for your country, which you add once. The
+files are on the [Country files](../../releases/tag/countries) Release, built monthly from Open
+Food Facts (ODbL) by [tools/build-country-files.py](tools/build-country-files.py).
+
 ## Food data
 
 The built-in foods come from USDA FoodData Central (public domain) and the ANSES-CIQUAL French food
