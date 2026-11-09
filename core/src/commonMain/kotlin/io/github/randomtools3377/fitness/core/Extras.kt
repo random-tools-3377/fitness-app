@@ -43,7 +43,7 @@ object CsvExport {
     private fun cell(x: String): String =
         if (x.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"" + x.replace("\"", "\"\"") + "\"" else x
 
-    private fun num(x: Double?): String = x?.let { formatAmount(Math.round(it * 100) / 100.0) }.orEmpty()
+    private fun num(x: Double?): String = x?.let { formatAmount(kotlin.math.round(it * 100) / 100.0) }.orEmpty()
 
     private fun row(vararg cells: String) = cells.joinToString(",") { cell(it) }
 
