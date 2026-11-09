@@ -104,6 +104,21 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
             "WORKOUT" -> tab = Tab.WORKOUTS
             "WEIGH_IN" -> { tab = Tab.PROGRESS; progressPart = "weight" }
             "FAST" -> { tab = Tab.PLAN; vm.planPart.value = "fasting" }
+            // The widget's "Add food" (0.10.0): the meal that fits the time of day.
+            "ADD_FOOD" -> {
+                tab = Tab.DIARY
+                vm.day.value = vm.today()
+                val hour = java.time.LocalTime.now().hour
+                val meal = when {
+                    hour < 11 -> io.github.randomtools3377.fitness.core.Meal.BREAKFAST
+                    hour < 15 -> io.github.randomtools3377.fitness.core.Meal.LUNCH
+                    hour < 17 -> io.github.randomtools3377.fitness.core.Meal.SNACKS
+                    hour < 21 -> io.github.randomtools3377.fitness.core.Meal.DINNER
+                    else -> io.github.randomtools3377.fitness.core.Meal.SNACKS
+                }
+                stack.clear()
+                stack.add(Route.AddFood(meal))
+            }
             else -> tab = Tab.DIARY
         }
         vm.openFromReminder.value = null

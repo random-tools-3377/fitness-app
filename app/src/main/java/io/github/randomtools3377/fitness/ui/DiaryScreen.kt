@@ -74,7 +74,10 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
     val water by vm.water.collectAsState()
     val settings by vm.settings.collectAsState()
     val units by vm.units.collectAsState()
-    val burned by vm.dayBurned.collectAsState()
+    val workoutBurned by vm.dayBurned.collectAsState()
+    val steps by vm.daySteps.collectAsState()
+    val stepsKcal by vm.dayStepsKcal.collectAsState()
+    val burned = workoutBurned + stepsKcal
     val dayWorkouts by vm.dayWorkouts.collectAsState()
     var editing by remember { mutableStateOf<DiaryEntry?>(null) }
     var savingMeal by remember { mutableStateOf<Meal?>(null) }
@@ -117,7 +120,7 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
             }
         }
 
-        item { SummaryCard(totals.total, burned, settings.burnedHalf, settings.targetKcal, settings.macros.grams(settings.targetKcal ?: 0), settings.extraTargets, units, open) }
+        item { SummaryCard(totals.total, burned, settings.burnedHalf, settings.targetKcal, settings.macros.grams(settings.targetKcal ?: 0), settings.extraTargets, units, open, steps, stepsKcal) }
 
         if (dayWorkouts.isNotEmpty()) {
             item {
@@ -216,10 +219,21 @@ private fun SummaryCard(
     extraTargets: io.github.randomtools3377.fitness.core.ExtraTargets,
     units: UnitSettings,
     open: (Route) -> Unit,
+    steps: Long? = null,
+    stepsKcal: Double = 0.0,
 ) {
     Section("Calories") {
         LabelValue("Eaten", energy(eaten.kcal, units), tag = "day-kcal")
-        if (burned > 0) LabelValue(if (half) "Burned in workouts (half)" else "Burned in workouts", energy(burned, units), tag = "day-burned")
+        val inWorkouts = burned - stepsKcal
+        if (inWorkouts > 0) LabelValue(if (half) "Burned in workouts (half)" else "Burned in workouts", energy(inWorkouts, units), tag = "day-burned")
+        // Steps from Health Connect (0.10.0).
+        if (steps != null) {
+            LabelValue(
+                "Steps",
+                Units.grouped(steps.toInt()) + if (stepsKcal > 0) " · ${energy(stepsKcal, units)}" + (if (half) " (half)" else "") else "",
+                tag = "day-steps",
+            )
+        }
         if (targetKcal == null) {
             Text("Set a daily target to see what is left.", style = MaterialTheme.typography.bodyMedium)
             Button(onClick = { open(Route.Target) }, modifier = Modifier.testTag("set-target")) { Text("Set my target") }

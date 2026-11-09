@@ -342,3 +342,41 @@ fun ThemeSection(vm: MainViewModel, settings: AppSettings) {
         Choices(accents, t.accent, { it.title }, { "accent:${it.name}" }) { vm.setTheme(t.copy(accent = it)) }
     }
 }
+
+/** Steps from Health Connect, which works offline (0.10.0). */
+@Composable
+fun StepsSection(vm: MainViewModel, settings: AppSettings) {
+    val context = LocalContext.current
+    val ask = rememberLauncherForActivityResult(androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()) { granted ->
+        if (granted.containsAll(io.github.randomtools3377.fitness.steps.HealthSteps.PERMISSIONS)) {
+            vm.setStepsOn(true)
+        } else {
+            vm.message.value = "Steps weren't allowed. You can allow them later in Health Connect."
+        }
+    }
+    Section("Steps") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Count steps from the phone")
+                Text(
+                    "Read from Health Connect, on the phone. Steps add about 35 kcal per 1,000 at 70 kg to the day; " +
+                        "steps during a logged workout aren't counted twice. They follow the half-count choice above.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(
+                checked = settings.stepsOn,
+                onCheckedChange = { on ->
+                    if (!on) {
+                        vm.setStepsOn(false)
+                    } else if (!io.github.randomtools3377.fitness.steps.HealthSteps.available(context)) {
+                        vm.message.value = "Health Connect isn't on this phone. On Android 13 and older, install the Health Connect app first."
+                    } else {
+                        ask.launch(io.github.randomtools3377.fitness.steps.HealthSteps.PERMISSIONS)
+                    }
+                },
+                modifier = Modifier.testTag("steps-on"),
+            )
+        }
+    }
+}

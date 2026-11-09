@@ -17,6 +17,7 @@ espresso = "3.6.1"
 androidxTestRules = "1.6.1"
 zxingEmbedded = "4.3.0"
 tesseract4android = "4.7.0"
+healthConnect = "1.1.0"
 biometric = "1.1.0"
 fragment = "1.8.5"
 
@@ -48,6 +49,7 @@ androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidxT
 
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 androidx-fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
+health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
 tesseract4android = { module = "com.github.adaptech-cz.Tesseract4Android:tesseract4android", version.ref = "tesseract4android" }
 zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingEmbedded" }
 

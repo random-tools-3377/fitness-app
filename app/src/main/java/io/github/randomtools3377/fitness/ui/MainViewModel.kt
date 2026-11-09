@@ -98,6 +98,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setBurnedHalf(half: Boolean) = launchSafely { repo.updateSettings { it.copy(burnedHalf = half) } }
 
+    /** The day's steps and the calories they add (0.10.0), read from Health Connect when steps are on. */
+    val daySteps = MutableStateFlow<Long?>(null)
+    val dayStepsKcal = MutableStateFlow(0.0)
+
+    /** Reads the day's steps again: when the app comes back to the front, or the day changes. */
+    fun refreshSteps() = viewModelScope.launch {
+        val s = repo.settingsOnce()
+        val d = day.value
+        if (!s.stepsOn) {
+            daySteps.value = null
+            dayStepsKcal.value = 0.0
+        } else {
+            daySteps.value = runCatching { repo.allStepsOn(d, s) }.getOrDefault(0)
+            dayStepsKcal.value = runCatching { repo.stepsKcal(d, s) }.getOrDefault(0.0)
+        }
+        io.github.randomtools3377.fitness.widget.TodayWidget.refresh(getApplication())
+    }
+
+    fun setStepsOn(on: Boolean) = launchSafely {
+        repo.updateSettings { it.copy(stepsOn = on) }
+        refreshSteps()
+    }
+
     val weighIns: StateFlow<List<WeighIn>> = repo.weighIns.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val foods: StateFlow<List<Food>> = repo.foods.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val savedMeals: StateFlow<List<SavedMeal>> = repo.savedMeals.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -176,6 +199,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
+        // Steps follow the day shown; the home-screen widget follows the day's food and water (0.10.0).
+        viewModelScope.launch { day.collect { refreshSteps() } }
+        viewModelScope.launch {
+            combine(repo.allEntries, repo.allWater, settings) { _, _, _ -> Unit }
+                .debounce(500)
+                .collect { io.github.randomtools3377.fitness.widget.TodayWidget.refresh(getApplication()) }
+        }
         viewModelScope.launch {
             // Reminders are set again each time the app starts, in case the phone dropped them.
             runCatching { io.github.randomtools3377.fitness.reminders.ReminderScheduler.schedule(getApplication(), repo.settingsOnce().reminders) }

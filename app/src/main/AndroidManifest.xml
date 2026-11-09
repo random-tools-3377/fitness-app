@@ -26,6 +26,13 @@
     <!-- Reminders (0.4.0): set again after the phone restarts. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Steps (0.10.0), read from Health Connect on the phone when the user turns them on. -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
     <!--
         No phone backup and no phone-to-phone transfer: Google or Samsung backup would upload
         the diary. allowBackup="false" covers cloud backup; the rules files also exclude
@@ -95,6 +102,28 @@
                 android:name="androidx.emoji2.text.EmojiCompatInitializer"
                 tools:node="remove" />
         </provider>
+
+        <!-- Why the app reads steps, shown by Health Connect (Android 13 and older). -->
+        <activity
+            android:name=".steps.StepsRationaleActivity"
+            android:exported="true"
+            android:label="Steps in Fitness App">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
+        <!-- The same, on Android 14 and later. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".steps.StepsRationaleActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- The home-screen widget (0.10.0). -->
         <receiver

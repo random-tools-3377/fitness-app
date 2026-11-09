@@ -112,6 +112,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
             PlatesRow(vm, settings)
         }
 
+        StepsSection(vm, settings)
         ThemeSection(vm, settings)
         RemindersSection(vm, settings)
         PrivacySection(vm, settings)

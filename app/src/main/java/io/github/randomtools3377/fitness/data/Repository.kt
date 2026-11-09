@@ -24,6 +24,7 @@ import io.github.randomtools3377.fitness.core.WeighIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -179,6 +180,28 @@ class Repository(private val context: Context, val db: AppDatabase) {
     fun water(day: LocalDate): Flow<List<WaterEntry>> = dao.waterOn(day.toDay()).map { r -> r.map { it.toCore() } }
     suspend fun addWater(day: LocalDate, ml: Int, now: Long) = dao.insertWater(listOf(WaterRow(day = day.toDay(), ml = ml, at = now)))
     suspend fun undoWater(day: LocalDate) = dao.deleteLastWater(day.toDay())
+    suspend fun waterOn(day: LocalDate): Int = dao.waterOn(day.toDay()).first().sumOf { it.ml }
+
+    // Steps from Health Connect (0.10.0).
+
+    /** The day's steps that count for calories: none during a logged workout. 0 when steps are off. */
+    suspend fun stepsOn(day: LocalDate, s: AppSettings): Long {
+        if (!s.stepsOn) return 0
+        val records = io.github.randomtools3377.fitness.steps.HealthSteps.day(context, day)
+        val during = workouts.first().filter { it.day == day && it.finished }.map { it.startedAt to (it.endedAt ?: it.startedAt) }
+        return io.github.randomtools3377.fitness.core.Steps.countable(records, during)
+    }
+
+    /** All the day's steps, for showing. */
+    suspend fun allStepsOn(day: LocalDate, s: AppSettings): Long =
+        if (!s.stepsOn) 0 else io.github.randomtools3377.fitness.steps.HealthSteps.day(context, day).sumOf { it.count }
+
+    suspend fun stepsKcal(day: LocalDate, s: AppSettings): Double {
+        val steps = stepsOn(day, s)
+        if (steps <= 0) return 0.0
+        val kg = io.github.randomtools3377.fitness.core.Weight.latest(weighInsOnce())?.kg ?: s.profile?.weightKg ?: return 0.0
+        return io.github.randomtools3377.fitness.core.Steps.kcal(steps, kg, s.burnedHalf)
+    }
 
     // Measurements, sleep and mood, habits and progress photos (0.8.0).
     val measurements: Flow<List<io.github.randomtools3377.fitness.core.Measurement>> = well.measurements().map { r -> r.map { it.toCore() } }
