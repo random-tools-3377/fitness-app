@@ -1,0 +1,15 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+# Signing material never lives in the repository.
+*.jks
+*.keystore
+*.p12
+*.pfx

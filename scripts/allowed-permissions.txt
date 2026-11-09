@@ -1,0 +1,5 @@
+# Every permission the release APK may ask for. Anything else fails CI.
+# Network permissions are never allowed, whatever this file says.
+
+# Added by AndroidX so the app's own broadcast receivers are private to it. Not a network permission.
+${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION

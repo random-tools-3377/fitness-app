@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A plate with a fork and knife. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,34 a20,20 0 1,1 0,40 a20,20 0 1,1 0,-40"
+        android:strokeWidth="5"
+        android:strokeColor="#FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,44 a10,10 0 1,1 0,20 a10,10 0 1,1 0,-20"
+        android:strokeWidth="3"
+        android:strokeColor="#FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M27,34 L27,46 M31,34 L31,74 M35,34 L35,46 M27,46 L35,46"
+        android:strokeLineCap="round"
+        android:strokeWidth="3"
+        android:strokeColor="#FFFFFF" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M81,34 C76,38 76,50 79,54 L79,74 L83,74 L83,34 Z" />
+</vector>
