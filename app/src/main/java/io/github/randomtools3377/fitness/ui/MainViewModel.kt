@@ -1,5 +1,7 @@
 package io.github.randomtools3377.fitness.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -58,6 +60,9 @@ data class TargetOffer(val currentKcal: Int?, val newKcal: Int)
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MainViewModel(app: Application) : AndroidViewModel(app) {
+    /** Which part of the Plan tab is open, kept while a recipe or food screen is on top. */
+    var planPart by androidx.compose.runtime.mutableStateOf("meals")
+
     private val repo = (app as FitnessApplication).container.repository
     private val resolver = app.contentResolver
 

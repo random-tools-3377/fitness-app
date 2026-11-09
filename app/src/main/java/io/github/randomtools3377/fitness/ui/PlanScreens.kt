@@ -39,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,14 +61,14 @@ import kotlinx.datetime.plus
 /** The Plan tab: meals planned ahead, the shopping list, and recipes. */
 @Composable
 fun PlanScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
-    var part by rememberSaveable { mutableStateOf("meals") }
+    val part = vm.planPart
     Column(modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Choices(
                 listOf("meals", "shopping", "recipes"), part,
                 { when (it) { "meals" -> "Meals"; "shopping" -> "Shopping list"; else -> "Recipes" } },
                 { "plan:$it" },
-            ) { part = it }
+            ) { vm.planPart = it }
         }
         when (part) {
             "meals" -> PlanMeals(vm, open)
