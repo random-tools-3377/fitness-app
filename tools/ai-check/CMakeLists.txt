@@ -1,0 +1,22 @@
+# The AI check's command-line tool: the app's own AI code (app/src/main/cpp/fitness_ai.cpp) with
+# llama.cpp, built for a Linux machine. LLAMA_DIR is a llama.cpp checkout at the same version the
+# app uses (see app/src/main/cpp/CMakeLists.txt).
+cmake_minimum_required(VERSION 3.22)
+project(ai_check C CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_APP OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_MTMD ON CACHE BOOL "" FORCE)
+set(LLAMA_OPENSSL OFF CACHE BOOL "" FORCE)
+set(LLAMA_SUBPROCESS OFF CACHE BOOL "" FORCE)
+set(MTMD_VIDEO OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+add_subdirectory(${LLAMA_DIR} llama)
+set(APP_CPP ${CMAKE_CURRENT_LIST_DIR}/../../app/src/main/cpp)
+add_executable(ai-check main.cpp ${APP_CPP}/fitness_ai.cpp)
+target_include_directories(ai-check PRIVATE ${APP_CPP} ${LLAMA_DIR}/tools/mtmd)
+target_link_libraries(ai-check PRIVATE llama mtmd)

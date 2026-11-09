@@ -1,0 +1,2 @@
+root ::= line line? line? line? line? line? line? line?
+line ::= [a-zA-Z] [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? [a-zA-Z ,'-]? "\n"

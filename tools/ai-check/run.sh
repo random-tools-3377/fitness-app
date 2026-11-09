@@ -1,29 +1,93 @@
 #!/usr/bin/env bash
-# The AI check (see .github/workflows/ai-check.yml). Usage: run.sh STEP
+# The AI check (see .github/workflows/ai-check.yml): builds llama.cpp and the app's own AI code
+# for Linux, downloads the models from Hugging Face (pinned, with SHA-256 sums), and asks them
+# the app's own prompts (app/src/main/assets/ai) about sample meals, a recipe, a week, a spoken
+# sentence and a photo of a plate. Prints every answer and how long it took.
+# Usage: run.sh all|probe|text|speech|plate
 set -euo pipefail
 step="${1:-all}"
 here="$(cd "$(dirname "$0")" && pwd)"
-echo "Step: $step"
+repo="$(cd "$here/../.." && pwd)"
+assets="$repo/app/src/main/assets/ai"
+work="${RUNNER_TEMP:-/tmp}/ai-check"
+mkdir -p "$work"
+# shellcheck source=/dev/null
+source "$here/models.sh"
+
+build() {
+  if [ ! -x "$work/build/ai-check" ]; then
+    git clone --quiet --depth 1 --branch "$LLAMA_TAG" https://github.com/ggml-org/llama.cpp "$work/llama"
+    [ "$(git -C "$work/llama" rev-parse HEAD)" = "$LLAMA_COMMIT" ] || { echo "llama.cpp tag moved"; exit 1; }
+    cmake -S "$here" -B "$work/build" -DLLAMA_DIR="$work/llama" -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON > "$work/cmake.log"
+    cmake --build "$work/build" --target ai-check -j "$(nproc)" > "$work/build.log" || { tail -50 "$work/build.log"; exit 1; }
+  fi
+}
+
+# fetch REPO REVISION FILE SHA256: downloads one model file into $work/models.
+fetch() {
+  local out="$work/models/$3"
+  mkdir -p "$work/models"
+  if [ ! -f "$out" ]; then
+    curl -sSfL --retry 3 -o "$out.part" "https://huggingface.co/$1/resolve/$2/$3"
+    echo "$4  $out.part" | sha256sum -c --quiet -
+    mv "$out.part" "$out"
+  fi
+}
+
+ask() {  # ask MODEL MMPROJ SYSTEM USER GRAMMAR MEDIA MAX PREFIX
+  "$work/build/ai-check" "$@" 2>&1 | grep -v "^\s*$" || true
+}
 
 if [ "$step" = "probe" ]; then
-  python3 - <<'PY'
-import json, urllib.request
-repos = ["ggml-org/Qwen3-ASR-0.6B-GGUF", "ggml-org/SmolVLM-500M-Instruct-GGUF", "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
-         "ggml-org/Qwen3-1.7B-GGUF", "Qwen/Qwen3-1.7B-GGUF", "unsloth/Qwen3-1.7B-GGUF", "Qwen/Qwen3-ASR-0.6B",
-         "HuggingFaceTB/SmolVLM-500M-Instruct", "Qwen/Qwen3-1.7B", "Qwen/Qwen2.5-1.5B-Instruct",
-         "ggml-org/SmolVLM2-500M-Video-Instruct-GGUF", "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"]
-for r in repos:
-    try:
-        d = json.load(urllib.request.urlopen(f"https://huggingface.co/api/models/{r}?blobs=true", timeout=60))
-    except Exception as e:
-        print(f"== {r}: {e}"); continue
-    lic = (d.get("cardData") or {}).get("license"), [t for t in d.get("tags", []) if t.startswith("license:")]
-    print(f"== {r}  sha={d.get('sha')}  license={lic}  base={[t for t in d.get('tags',[]) if t.startswith('base_model:')][:3]}")
-    for s in d.get("siblings", []):
-        n = s["rfilename"]
-        if n.endswith(".gguf") or n in ("LICENSE", "README.md"):
-            print(f"   {n}  {s.get('size')}  {(s.get('lfs') or {}).get('sha256')}")
-PY
+  echo "Nothing to probe."
   exit 0
 fi
-echo "Unknown step"
+
+build
+cases="$here/cases"
+
+if [ "$step" = "all" ] || [ "$step" = "text" ]; then
+  fetch "$TEXT_REPO" "$TEXT_REV" "$TEXT_FILE" "$TEXT_SHA"
+  m="$work/models/$TEXT_FILE"
+  echo "===== Meals"
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    printf '%s' "$line" > "$work/user.txt"
+    echo "--- $line"
+    ask "$m" - "$assets/meal-system.txt" "$work/user.txt" "$assets/meal.gbnf" - 300 "$assets/qwen3-prefix.txt"
+  done < "$cases/meals.txt"
+  for r in "$cases"/recipe-*.txt; do
+    echo "===== Recipe $(basename "$r")"
+    ask "$m" - "$assets/recipe-system.txt" "$r" "$assets/meal.gbnf" - 600 "$assets/qwen3-prefix.txt"
+  done
+  for w in "$cases"/week-*.txt; do
+    echo "===== Week $(basename "$w")"
+    ask "$m" - "$assets/summary-system.txt" "$w" - - 250 "$assets/qwen3-prefix.txt"
+  done
+fi
+
+if [ "$step" = "all" ] || [ "$step" = "speech" ]; then
+  fetch "$SPEECH_REPO" "$SPEECH_REV" "$SPEECH_FILE" "$SPEECH_SHA"
+  fetch "$SPEECH_REPO" "$SPEECH_REV" "$SPEECH_MMPROJ" "$SPEECH_MMPROJ_SHA"
+  command -v espeak-ng > /dev/null || sudo apt-get install -y -qq espeak-ng > /dev/null
+  echo "===== Speech"
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    espeak-ng -v en-gb -s 150 -w "$work/said.wav" "$line"
+    # 16 kHz mono, as the phone records it.
+    ffmpeg -loglevel error -y -i "$work/said.wav" -ar 16000 -ac 1 "$work/said16.wav"
+    echo "--- said: $line"
+    ask "$work/models/$SPEECH_FILE" "$work/models/$SPEECH_MMPROJ" /dev/null "$assets/speech-user.txt" - "$work/said16.wav" 120 -
+  done < "$cases/spoken.txt"
+fi
+
+if [ "$step" = "all" ] || [ "$step" = "plate" ]; then
+  fetch "$PLATE_REPO" "$PLATE_REV" "$PLATE_FILE" "$PLATE_SHA"
+  fetch "$PLATE_REPO" "$PLATE_REV" "$PLATE_MMPROJ" "$PLATE_MMPROJ_SHA"
+  echo "===== Plates"
+  python3 "$here/plates.py" "$work/plates"
+  for p in "$work"/plates/*.jpg; do
+    echo "--- $(basename "$p")"
+    ask "$work/models/$PLATE_FILE" "$work/models/$PLATE_MMPROJ" "$assets/plate-system.txt" "$assets/plate-user.txt" "$assets/plate.gbnf" "$p" 80 -
+  done
+fi
