@@ -25,5 +25,9 @@ kotlin {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
         }
+        // Runs the label-reading models for real when FITNESS_AI_MODELS points at them.
+        jvmTest.dependencies {
+            implementation(libs.onnxruntime.jvm)
+        }
     }
 }

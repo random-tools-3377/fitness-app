@@ -62,6 +62,11 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // ONNX Runtime (better label reading, 0.16.0) only for ARM phones, to keep the app smaller.
+        // On an x86 device the optional reader can't load, and labels are read with Tesseract.
+        jniLibs {
+            excludes += setOf("lib/x86/libonnxruntime*.so", "lib/x86_64/libonnxruntime*.so")
+        }
     }
 }
 
@@ -97,6 +102,8 @@ dependencies {
     // Barcode scanning (0.3.0): ZXing, Apache-2.0, works offline.
     implementation(libs.zxing.android.embedded)
     implementation(libs.tesseract4android)
+    // Better label reading (0.16.0): ONNX Runtime, MIT, runs the optional PaddleOCR models on the phone.
+    implementation(libs.onnxruntime.android)
     implementation(libs.health.connect)
     // The privacy lock (0.4.0) asks for the phone's own fingerprint, face or PIN.
     implementation(libs.androidx.biometric)

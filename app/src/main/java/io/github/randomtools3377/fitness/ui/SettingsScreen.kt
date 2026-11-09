@@ -187,7 +187,9 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
             )
             Text(
                 "Reading labels uses Tesseract OCR and its English data (tessdata_fast), through Tesseract4Android, " +
-                    "all under the Apache License 2.0. Barcode scanning uses ZXing, under the Apache License 2.0.",
+                    "all under the Apache License 2.0. Barcode scanning uses ZXing, under the Apache License 2.0. " +
+                    "Better label reading, if you add it, uses PaddleOCR's PP-OCRv6 models (Baidu and the PaddleOCR authors, " +
+                    "as converted by RapidOCR, Apache License 2.0), run with ONNX Runtime (MIT License).",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

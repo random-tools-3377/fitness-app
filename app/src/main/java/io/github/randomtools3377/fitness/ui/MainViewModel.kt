@@ -430,10 +430,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         settings.map { io.github.randomtools3377.fitness.core.Features.enabled(it) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.randomtools3377.fitness.core.Features.STARTS_ON)
 
+    /** The optional AI model files opened on this phone (0.16.0). */
+    val aiInstalled = MutableStateFlow(io.github.randomtools3377.fitness.ai.AiModels.installed(app))
+    val aiInstalling = MutableStateFlow(false)
+
+    fun installAi(uri: Uri) {
+        if (aiInstalling.value) return
+        aiInstalling.value = true
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            try {
+                io.github.randomtools3377.fitness.ai.AiModels.install(app, uri)
+                message.value = "Ready: better label reading is on the phone"
+            } catch (e: io.github.randomtools3377.fitness.ai.AiModels.NotAModelFile) {
+                message.value = e.message
+            } catch (e: Exception) {
+                message.value = "That file could not be read. Download it again and try once more."
+            } finally {
+                aiInstalled.value = io.github.randomtools3377.fitness.ai.AiModels.installed(app)
+                aiInstalling.value = false
+            }
+        }
+    }
+
+    fun removeAi(id: String) {
+        val app = getApplication<Application>()
+        io.github.randomtools3377.fitness.ai.AiModels.remove(app, id)
+        aiInstalled.value = io.github.randomtools3377.fitness.ai.AiModels.installed(app)
+    }
+
     fun setFeature(f: io.github.randomtools3377.fitness.core.Feature, isOn: Boolean) = launchSafely {
         repo.updateSettings { s ->
             val now = io.github.randomtools3377.fitness.core.Features.enabled(s)
-            val next = if (isOn) now + f else now - f
+            val next = io.github.randomtools3377.fitness.core.Features.switch(now, f, isOn)
             var out = s.copy(features = io.github.randomtools3377.fitness.core.Features.encode(next))
             // Parts with their own switch follow this one.
             if (f == io.github.randomtools3377.fitness.core.Feature.CYCLE) out = out.copy(cycleOn = isOn)

@@ -2,9 +2,10 @@ package io.github.randomtools3377.fitness.core
 
 /**
  * The parts of the app that can be switched off, so it only shows what the user uses (0.15.0).
- * The food diary and Settings always stay. [startsOn] is for a new install.
+ * The food diary and Settings always stay. [startsOn] is for a new install. [ai] marks the
+ * optional on-phone AI parts (0.16.0), which are listed apart and need a model file.
  */
-enum class Feature(val title: String, val description: String, val startsOn: Boolean = false) {
+enum class Feature(val title: String, val description: String, val startsOn: Boolean = false, val ai: Boolean = false) {
     WORKOUTS("Workouts", "Log weights, cardio and bodyweight exercises, with a rest timer and personal bests.", startsOn = true),
     WATER("Water", "A daily water target with buttons for a glass or a bottle.", startsOn = true),
     WEIGHT("Weight", "Weigh-ins with a chart and a 7-day average.", startsOn = true),
@@ -27,6 +28,11 @@ enum class Feature(val title: String, val description: String, val startsOn: Boo
     CHECK_IN("Weekly check-in", "On Mondays, how your weight moved against the plan, with a suggested target."),
     TRAINING_EXTRAS("Training extras", "A weekly programme, plate calculator, hints, supersets, warm-ups, notes and an interval timer."),
     OVERVIEW("Calendar and year in review", "A month at a glance, and each year's totals and bests."),
+    AI_LABELS(
+        "Better label reading",
+        "Reads more of a label's numbers right, using a larger reading model on the phone. Needs a one-time 27 MB download.",
+        ai = true,
+    ),
 }
 
 /** What the user's data shows they already use, for turning those parts on when they update. */
@@ -70,6 +76,14 @@ object Features {
         if (s.cycleOn || u.hasPeriods) add(Feature.CYCLE)
         if (s.stepsOn) add(Feature.STEPS)
         if (s.programme.isNotEmpty() || s.exerciseNotes.isNotEmpty()) add(Feature.TRAINING_EXTRAS)
+    }
+
+    /** Switching one part on can need another: better label reading needs reading labels. */
+    fun switch(on: Set<Feature>, f: Feature, isOn: Boolean): Set<Feature> = when {
+        isOn && f == Feature.AI_LABELS -> on + f + Feature.LABEL_PHOTO
+        !isOn && f == Feature.LABEL_PHOTO -> on - f - Feature.AI_LABELS
+        isOn -> on + f
+        else -> on - f
     }
 
     fun encode(on: Set<Feature>): Set<String> = on.map { it.name }.toSet()
