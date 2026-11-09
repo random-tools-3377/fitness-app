@@ -88,6 +88,13 @@ workouts or exports.
 - Water has a daily target **(default: 2 litres, with buttons for a glass of 250 ml and a bottle
   of 500 ml, sizes the user can change)**.
 
+- Each meal can have its own calorie target.
+- **Details (default):** off until the user turns it on. The day's target is split between
+  breakfast, lunch, dinner and snacks (25%, 35%, 30% and 10% to start), changeable in
+  percentages or calories, and protein, carbs and fat follow the same split. Each meal shows
+  what is left of its own share. Going over in one meal doesn't take from the others' shares;
+  the day's total still counts.
+
 ## Body weight
 
 - Weigh-ins, with a chart over time.
@@ -113,12 +120,53 @@ workouts or exports.
   its speed when a distance is given; weights and bodyweight use the workout's length. Added in
   full, with a Settings choice to count only half, because estimates tend to run high.
 
+## Recipes
+
+- Recipes made from several foods, split into servings.
+- **Details (default):** a recipe lists its foods and amounts and how many servings it makes,
+  and the app works out calories and protein, carbs and fat per serving. It can also be logged
+  by weight: the user weighs the finished dish once, then logs it in grams, which allows for
+  water lost in cooking. A recipe can have notes for the method. Changing a recipe applies from
+  then on; days already logged keep what they were.
+
+## Planning meals ahead
+
+- Meals can be planned for the coming days.
+- **Details (default):** foods, saved meals and recipes are put on a future day and meal. A day
+  shows its planned calories and protein, carbs and fat against the target, so a plan can be
+  balanced before it is eaten. On the day, ticking a planned item logs it as eaten; planned items
+  that aren't ticked don't count. A day's or a week's plan can be copied to another.
+
+## Shopping list
+
+- A shopping list made from planned meals.
+- **Details (default):** the user picks the days, and the list adds up the same food across
+  them. Recipes are broken into their foods. Items are ticked off in the shop, and the user can
+  add their own items, like washing-up liquid. Ticked items clear when a new list is made.
+
+## Fasting
+
+- A fasting timer.
+- **Details (default):** plans of 16:8, 18:6, 20:4 and 23:1, or the user's own hours. The timer
+  shows how long has gone and how long is left, and a notification says when the fast is done.
+  Logging food during a fast asks whether to end it. Past fasts are kept, and finishing a planned
+  fast counts toward a streak. The app gives no medical advice about fasting.
+
+## Stats and charts
+
+- Detailed stats and charts.
+- **Details (default):** week, month and year views with averages of calories and protein,
+  carbs and fat; days on target; the foods that give the most calories; weight against the goal,
+  with the date it would be reached at the current trend (marked as an estimate); workouts per
+  week; the total lifted (sets × reps × weight) per exercise and per muscle group over time;
+  personal bests over time; water; and fasts. The charts are drawn by the app itself.
+
 ## Keeping going
 
 - Streaks and personal bests. No points or shop, and no link to the checklist app.
 - **Streaks (default):** days with food logged; days on target (within 10% of the calorie target
   either side); weeks with the user's chosen number of workouts (3 to start), so rest days don't
-  break it; days the water target was reached.
+  break it; days the water target was reached; days a planned fast was finished.
 - **Personal bests (default):** heaviest weight, most reps at a weight, an estimated one-rep max,
   the longest and the fastest cardio. Beating one is celebrated on the spot.
 
@@ -166,12 +214,13 @@ Build order **(default)**, each step a Release the owner can try:
 2. Workouts: weights, cardio, bodyweight and timed, saved workouts, the rest timer, personal
    bests, and calories burned added to the day. (0.2.0)
 3. Barcode scanning and the country files. (0.3.0)
-4. Streaks, charts, reminders, the privacy lock and the automatic backup. (0.4.0)
+4. Streaks, stats and charts, reminders, the privacy lock and the automatic backup. (0.4.0)
+5. Recipes, planning meals ahead and the shopping list. (0.5.0)
+6. A target for each meal, and the fasting timer. (0.6.0)
 
 ## Not decided yet
 
-- A home-screen widget; reading steps from the phone (Health Connect, which works offline);
-  recipes made from several foods.
+- A home-screen widget; reading steps from the phone (Health Connect, which works offline).
 
 ## Talking to the owner
 
