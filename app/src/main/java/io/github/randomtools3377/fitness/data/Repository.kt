@@ -12,7 +12,10 @@ import io.github.randomtools3377.fitness.core.Exercises
 import io.github.randomtools3377.fitness.core.SavedWorkout
 import io.github.randomtools3377.fitness.core.Workout
 import io.github.randomtools3377.fitness.core.Food
+import io.github.randomtools3377.fitness.core.Plan
 import io.github.randomtools3377.fitness.core.Product
+import io.github.randomtools3377.fitness.core.Recipe
+import io.github.randomtools3377.fitness.core.ShoppingItem
 import io.github.randomtools3377.fitness.core.SavedMeal
 import io.github.randomtools3377.fitness.core.Usage
 import io.github.randomtools3377.fitness.core.WaterEntry
@@ -95,6 +98,7 @@ class Repository(private val context: Context, val db: AppDatabase) {
 
     /** The food an entry came from, built-in or typed in, if it still exists. */
     suspend fun foodOf(entry: DiaryEntry): Food? = when {
+        entry.builtInId?.startsWith(Recipe.PREFIX) == true -> entry.builtInId!!.drop(1).toLongOrNull()?.let { dao.recipe(it) }?.toCore()?.toFood()
         entry.builtInId?.startsWith(Product.PREFIX) == true -> products.product(entry.builtInId!!.drop(1))?.toCore()?.toFood()
         entry.builtInId != null -> builtInFood(entry.builtInId!!)
         entry.foodId != null -> dao.food(entry.foodId!!)?.toCore()
@@ -114,6 +118,38 @@ class Repository(private val context: Context, val db: AppDatabase) {
     /** The whole diary and all water, for the stats and streaks (0.4.0). */
     val allEntries: Flow<List<DiaryEntry>> = dao.entriesFlow().map { r -> r.map { it.toCore() } }
     val allWater: Flow<List<WaterEntry>> = dao.waterFlow().map { r -> r.map { it.toCore() } }
+
+    // Planning, recipes and the shopping list (0.5.0).
+    fun entriesBetween(from: LocalDate, to: LocalDate): Flow<List<DiaryEntry>> =
+        dao.entriesBetween(from.toDay(), to.toDay()).map { r -> r.map { it.toCore() } }
+
+    suspend fun entriesBetweenOnce(from: LocalDate, to: LocalDate): List<DiaryEntry> =
+        (from.toEpochDays()..to.toEpochDays()).flatMap { dao.entriesOnce(it.toLong()) }.map { it.toCore() }
+
+    val recipes: Flow<List<Recipe>> = dao.recipes().map { r -> r.map { it.toCore() } }
+    suspend fun recipe(id: Long): Recipe? = dao.recipe(id)?.toCore()
+    suspend fun saveRecipe(r: Recipe): Long = if (r.id == 0L) dao.putRecipe(r.toRow()) else { dao.putRecipe(r.toRow()); r.id }
+    suspend fun deleteRecipe(id: Long) = dao.hideRecipe(id)
+
+    val shopping: Flow<List<ShoppingItem>> = dao.shopping().map { r -> r.map { it.toCore() } }
+    suspend fun tickShopping(id: Long, ticked: Boolean) = dao.tickShopping(id, ticked)
+    suspend fun addOwnShopping(name: String) = dao.insertShopping(listOf(ShoppingItem(name = name.trim(), own = true).toRow()))
+    suspend fun deleteShopping(id: Long) = dao.deleteShopping(id)
+
+    /**
+     * Makes a new shopping list from the planned items between two days: ticked items and the
+     * old list's foods go; the user's own items that aren't ticked stay.
+     */
+    suspend fun makeShoppingList(from: LocalDate, to: LocalDate) {
+        val planned = dao.plannedBetween(from.toDay(), to.toDay()).map { it.toCore() }
+        val recipes = dao.allRecipes().associate { it.id to it.toCore() }
+        builtInFoods()
+        val list = Plan.shopping(planned, recipes) { e -> runCatching { foodOf(e)?.let { f -> e.amount.baseAmount(f) } }.getOrNull() ?: e.amount.takeIf { it.portion == null }?.quantity }
+        db.withTransaction {
+            dao.clearMadeAndTicked()
+            dao.insertShopping(list.map { it.toRow() })
+        }
+    }
 
     // Saved meals.
     val savedMeals: Flow<List<SavedMeal>> = combine(dao.savedMeals(), dao.savedMealItems()) { m, i -> savedMealsOf(m, i) }
@@ -205,6 +241,8 @@ class Repository(private val context: Context, val db: AppDatabase) {
                 workouts = workoutsOf(dao.allWorkouts(), dao.allWorkoutSets()),
                 savedWorkouts = savedWorkoutsOf(dao.allSavedWorkouts(), dao.allSavedWorkoutItems()),
                 restSeconds = dao.allRestTimes().associate { it.exerciseKey to it.seconds },
+                recipes = dao.allRecipes().filter { !it.hidden }.map { it.toCore() },
+                shopping = dao.allShopping().map { it.toCore() },
             )
         }
         return Backup.encode(backup)
@@ -229,6 +267,8 @@ class Repository(private val context: Context, val db: AppDatabase) {
             dao.clearSavedWorkouts()
             dao.clearExercises()
             dao.clearRestTimes()
+            dao.clearRecipes()
+            dao.clearShopping()
             dao.insertFoods(backup.foods.map { it.toRow(now) })
             dao.insertEntries(backup.entries.map { it.toRow() })
             for (meal in backup.savedMeals) {
@@ -253,6 +293,9 @@ class Repository(private val context: Context, val db: AppDatabase) {
                 dao.insertSavedWorkoutItems(sw.itemRows(id))
             }
             for ((key, sec) in backup.restSeconds) dao.putRest(RestRow(key, sec))
+            // Recipes keep their ids, so planned and logged items still point to them.
+            for (r in backup.recipes) dao.putRecipe(r.toRow())
+            dao.insertShopping(backup.shopping.map { it.copy(id = 0).toRow() })
         }
     }
 

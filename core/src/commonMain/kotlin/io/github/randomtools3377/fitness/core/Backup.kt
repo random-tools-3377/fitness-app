@@ -68,12 +68,17 @@ data class Backup(
     val savedWorkouts: List<SavedWorkout> = emptyList(),
     /** Rest between sets, in seconds, for each exercise whose rest was changed, by its key. */
     val restSeconds: Map<String, Int> = emptyMap(),
+    /** Recipes and the shopping list (format 3). Planned items are among the entries. */
+    val recipes: List<Recipe> = emptyList(),
+    val shopping: List<ShoppingItem> = emptyList(),
+    /** Fasts (format 3). */
+    val fasts: List<Fast> = emptyList(),
 ) {
     companion object {
         const val APP = "fitness"
 
         /** Raised whenever the file's layout changes in a way older versions can't read. */
-        const val FORMAT = 2
+        const val FORMAT = 3
 
         private val json = Json {
             prettyPrint = true

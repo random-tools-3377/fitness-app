@@ -131,3 +131,12 @@ object Plan {
         return totals.values.sortedBy { it.name.lowercase() }
     }
 }
+
+/** Stores a recipe's foods as text in the database, in the same form as the backup file. */
+object RecipeText {
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+    private val serializer = kotlinx.serialization.builtins.ListSerializer(RecipeItem.serializer())
+
+    fun encode(items: List<RecipeItem>): String = json.encodeToString(serializer, items)
+    fun decode(text: String): List<RecipeItem> = if (text.isBlank()) emptyList() else json.decodeFromString(serializer, text)
+}

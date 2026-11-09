@@ -49,6 +49,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.plus
 import java.util.Locale
 
 /** A new worked-out target, offered after a weigh-in. The app never changes the target by itself. */
@@ -151,12 +153,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val query = MutableStateFlow("")
 
     /** Search results for [query]: the user's foods and the built-in ones, best first. */
-    val results: StateFlow<List<Food>> = combine(query.debounce(120), foods, builtIns, usage, usedProducts) { q, mine, built, used, products ->
+    private val recipeFoods: StateFlow<List<Food>> = repo.recipes.map { list -> list.map { it.toFood() } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val results: StateFlow<List<Food>> = combine(query.debounce(120), combine(foods, recipeFoods) { a, b -> b + a }, builtIns, usage, usedProducts) { q, mine, built, used, products ->
         FoodSearch.search(q, mine + products + built, used, now())
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Foods used before, the most recent and most used first. */
-    val recent: StateFlow<List<Food>> = combine(foods, builtIns, usage, usedProducts) { mine, built, used, products ->
+    val recent: StateFlow<List<Food>> = combine(combine(foods, recipeFoods) { a, b -> b + a }, builtIns, usage, usedProducts) { mine, built, used, products ->
         FoodSearch.recent(mine + products + built, used, now()).take(30)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -172,6 +177,85 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    // 0.5.0: planning ahead, recipes and the shopping list.
+
+    /** The first day the plan shows (a week from it). Tomorrow to start. */
+    val planDay = MutableStateFlow(today().plus(DatePeriod(days = 1)))
+
+    /** Planned and eaten items for the week from [planDay]. */
+    val planWeek: StateFlow<List<DiaryEntry>> = planDay.flatMapLatest { d -> repo.entriesBetween(d, d.plus(DatePeriod(days = 6))) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val recipes: StateFlow<List<io.github.randomtools3377.fitness.core.Recipe>> = repo.recipes.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val shopping: StateFlow<List<io.github.randomtools3377.fitness.core.ShoppingItem>> = repo.shopping.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Plans [food] for [day]'s [meal]. */
+    fun plan(food: Food, amount: Amount, day: LocalDate, meal: Meal) = launchSafely {
+        repo.addEntries(listOf(io.github.randomtools3377.fitness.core.Plan.plan(food, amount, day, meal, now())))
+        message.value = "Planned ${food.name}"
+    }
+
+    fun planQuickAdd(kcal: Double, name: String, day: LocalDate, meal: Meal) = launchSafely {
+        repo.addEntries(listOf(Diary.quickAdd(kcal, day, meal, now(), name).copy(planned = true)))
+        message.value = "Planned"
+    }
+
+    fun planSavedMeal(saved: SavedMeal, day: LocalDate, meal: Meal) = launchSafely {
+        repo.addEntries(saved.toEntries(day, meal, now()).map { it.copy(planned = true) })
+        message.value = "Planned ${saved.name}"
+    }
+
+    /** Ticks a planned item: it is logged as eaten now. */
+    fun eatPlanned(e: DiaryEntry) = launchSafely {
+        repo.updateEntry(io.github.randomtools3377.fitness.core.Plan.eat(e, now()))
+        message.value = "Logged ${e.name}"
+    }
+
+    /** Copies the planned items of [from] (one day, or the week from it) [days] days later. */
+    fun copyPlan(from: LocalDate, length: Int, days: Int) = launchSafely {
+        val source = repo.entriesBetweenOnce(from, from.plus(DatePeriod(days = length - 1))).filter { it.planned }
+        require(source.isNotEmpty()) { "There is nothing planned to copy." }
+        repo.addEntries(io.github.randomtools3377.fitness.core.Plan.copy(source, days, now()))
+        message.value = "Copied ${source.size} planned items"
+    }
+
+    /** The recipe being written or changed, kept here while foods are picked for it. */
+    val recipeDraft = MutableStateFlow<io.github.randomtools3377.fitness.core.Recipe?>(null)
+
+    fun editRecipe(r: io.github.randomtools3377.fitness.core.Recipe?) {
+        recipeDraft.value = r ?: io.github.randomtools3377.fitness.core.Recipe(name = "", servings = 4.0, items = emptyList())
+    }
+
+    fun addToRecipe(food: Food, amount: Amount) {
+        val d = recipeDraft.value ?: return
+        recipeDraft.value = d.copy(items = d.items + io.github.randomtools3377.fitness.core.Recipe.item(food, amount))
+    }
+
+    /** Saves the draft; gives back true when it was saved. */
+    suspend fun saveRecipe(): Boolean {
+        val d = recipeDraft.value ?: return false
+        val problems = d.problems()
+        if (problems.isNotEmpty()) { message.value = problems.first(); return false }
+        repo.saveRecipe(d.copy(name = d.name.trim(), createdAt = if (d.createdAt == 0L) now() else d.createdAt))
+        message.value = "Saved ${d.name.trim()}"
+        recipeDraft.value = null
+        return true
+    }
+
+    fun deleteRecipe(r: io.github.randomtools3377.fitness.core.Recipe) = launchSafely {
+        repo.deleteRecipe(r.id)
+        message.value = "Deleted ${r.name}. What was already logged keeps its numbers."
+    }
+
+    fun makeShoppingList(from: LocalDate, to: LocalDate) = launchSafely {
+        repo.makeShoppingList(from, to)
+        message.value = "Shopping list made"
+    }
+
+    fun tickShopping(i: io.github.randomtools3377.fitness.core.ShoppingItem) = launchSafely { repo.tickShopping(i.id, !i.ticked) }
+    fun addOwnShopping(name: String) = launchSafely { if (name.isNotBlank()) repo.addOwnShopping(name) }
+    fun deleteShopping(i: io.github.randomtools3377.fitness.core.ShoppingItem) = launchSafely { repo.deleteShopping(i.id) }
 
     // 0.4.0: reminders, the privacy lock, the automatic backup.
 
@@ -283,7 +367,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // Saved meals.
 
     fun saveMeal(name: String, meal: Meal) = launchSafely {
-        val items = entries.value.filter { it.meal == meal }
+        val items = entries.value.filter { it.meal == meal && !it.planned }
         repo.saveMeal(SavedMeal.from(name, items, now()))
         message.value = "Saved \"${name.trim()}\""
     }

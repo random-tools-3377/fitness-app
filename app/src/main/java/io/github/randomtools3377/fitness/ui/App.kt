@@ -11,9 +11,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.List
@@ -45,14 +49,24 @@ enum class Tab(val title: String, val icon: ImageVector) {
     DIARY("Diary", Icons.Filled.DateRange),
     FOODS("Foods", Icons.AutoMirrored.Filled.List),
     WORKOUTS("Workouts", Icons.Filled.PlayArrow),
+    PLAN("Plan", Icons.Filled.Edit),
     PROGRESS("Progress", Icons.Filled.Favorite),
-    SETTINGS("Settings", Icons.Filled.Settings),
 }
 
 /** Screens opened on top of the tabs. */
 sealed interface Route {
     /** Finding a food to add to [meal]. [openFoodKey] opens its amount straight away. */
-    data class AddFood(val meal: Meal, val openFoodKey: String? = null) : Route
+    data class AddFood(
+        val meal: Meal,
+        val openFoodKey: String? = null,
+        val mode: AddMode = AddMode.LOG,
+        val planDay: kotlinx.datetime.LocalDate? = null,
+    ) : Route
+
+    /** Writing or changing a recipe (the draft is kept in the view model). */
+    data object Recipe : Route
+
+    data object Settings : Route
 
     /** Typing in a food from its label: a new one, or changing [editId]. Adds it to [meal] after. */
     data class FoodForm(val editId: Long? = null, val meal: Meal? = null, val barcode: String? = null) : Route
@@ -142,14 +156,24 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel) {
                         }
                         if (progressPart == "stats") StatsScreen(svm, Modifier) else WeightScreen(vm, Modifier)
                     }
-                    Tab.SETTINGS -> SettingsScreen(vm, modifier, open = ::open)
+                    Tab.PLAN -> PlanScreen(vm, modifier, open = ::open)
                 }
             }
             is Route.AddFood -> AddFoodScreen(
                 vm, top.meal, top.openFoodKey, modifier,
                 back = ::back,
                 newFood = { code -> open(Route.FoodForm(meal = top.meal, barcode = code)) },
+                mode = top.mode,
+                planDay = top.planDay,
             )
+            Route.Recipe -> RecipeScreen(vm, modifier, back = ::back, addFood = { open(Route.AddFood(Meal.LUNCH, mode = AddMode.RECIPE)) })
+            Route.Settings -> Column(modifier) {
+                Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = ::back, modifier = Modifier.testTag("back")) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    Text("Settings", style = MaterialTheme.typography.titleLarge)
+                }
+                SettingsScreen(vm, Modifier, open = ::open)
+            }
             is Route.FoodForm -> FoodFormScreen(
                 vm, top.editId, modifier, barcode = top.barcode,
                 back = ::back,
@@ -157,8 +181,9 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel) {
                     back()
                     // A food typed in while adding to a meal goes straight on to its amount.
                     if (top.meal != null) {
+                        val previous = stack.lastOrNull() as? Route.AddFood
                         back()
-                        open(Route.AddFood(top.meal, food.key))
+                        open(Route.AddFood(top.meal, food.key, previous?.mode ?: AddMode.LOG, previous?.planDay))
                     }
                 },
             )
