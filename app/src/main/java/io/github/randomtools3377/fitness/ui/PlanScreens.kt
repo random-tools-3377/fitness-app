@@ -223,6 +223,7 @@ private fun ShoppingList(vm: MainViewModel) {
 private fun RecipeList(vm: MainViewModel, open: (Route) -> Unit) {
     val recipes by vm.recipes.collectAsState()
     val units by vm.units.collectAsState()
+    val pasteRecipe = on(io.github.randomtools3377.fitness.core.Feature.AI_RECIPES)
     LazyColumn(Modifier.fillMaxSize().testTag("recipe-list")) {
         item {
             Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -233,7 +234,7 @@ private fun RecipeList(vm: MainViewModel, open: (Route) -> Unit) {
                 Button(onClick = { vm.editRecipe(null); open(Route.Recipe) }, modifier = Modifier.testTag("new-recipe")) { Text("New recipe") }
             }
         }
-        if (on(io.github.randomtools3377.fitness.core.Feature.AI_RECIPES)) {
+        if (pasteRecipe) {
             item {
                 OutlinedButton(onClick = { open(Route.AiFoods(AiKind.RECIPE)) }, modifier = Modifier.padding(horizontal = 16.dp).testTag("ai-paste-recipe")) {
                     Text("Paste a recipe")
