@@ -8,7 +8,7 @@ CIQUAL
   Anses. Ciqual French food composition table. https://ciqual.anses.fr
   Under the Licence Ouverte / Etalab Open Licence 2.0
   (https://www.etalab.gouv.fr/licence-ouverte-open-licence/). Only the English food names and
-  the energy, protein, carbohydrate and fat values are used. This app is not endorsed by Anses.
+  the energy, protein, carbohydrate, fat, fibre, sugars, saturated fat and salt values are used. This app is not endorsed by Anses.
 
 The files used:
 
