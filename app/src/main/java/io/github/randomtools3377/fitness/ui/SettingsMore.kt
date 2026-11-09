@@ -1,5 +1,6 @@
 package io.github.randomtools3377.fitness.ui
 
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
