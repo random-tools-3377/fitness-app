@@ -93,12 +93,18 @@ object ReminderScheduler {
             context, 10 + r.kind.ordinal, Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN, r.kind.name),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val n = NotificationCompat.Builder(context, CHANNEL)
+        val builder = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(r.text)
             .setAutoCancel(true)
             .setContentIntent(open)
-            .build()
+        if (r.kind == io.github.randomtools3377.fitness.core.ReminderKind.SUPPLEMENT) {
+            // What someone takes stays off the lock screen.
+            builder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setPublicVersion(
+                NotificationCompat.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_notification).setContentTitle("A reminder from Fitness App").build(),
+            )
+        }
+        val n = builder.build()
         @Suppress("MissingPermission")
         NotificationManagerCompat.from(context).notify(100 + r.kind.ordinal * 10 + (r.meal?.ordinal ?: 0) + i, n)
     }

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -98,12 +99,51 @@ class BodyViewModel(app: Application) : AndroidViewModel(app) {
 
     // Habits.
 
-    fun addHabit(name: String) = launchSafely {
-        Habits.problem(name, habits.value)?.let { throw IllegalArgumentException(it) }
-        repo.addHabit(Habit(name = name.trim(), createdAt = now()))
+    fun addHabit(name: String) = addItem(name, io.github.randomtools3377.fitness.core.HabitKind.HABIT, null)
+
+    /** A habit, or a supplement or medicine with an optional reminder time (0.12.0). */
+    fun addItem(name: String, kind: io.github.randomtools3377.fitness.core.HabitKind, reminderMinute: Int?) = launchSafely {
+        Habits.problem(name, habits.value.filter { it.kind == kind })?.let { throw IllegalArgumentException(it) }
+        repo.addHabit(Habit(name = name.trim(), createdAt = now(), kind = kind, reminderMinute = reminderMinute))
+        syncReminders()
     }
 
-    fun archiveHabit(h: Habit, archived: Boolean) = launchSafely { repo.putHabit(h.copy(archived = archived)) }
+    fun archiveHabit(h: Habit, archived: Boolean) = launchSafely {
+        repo.putHabit(h.copy(archived = archived))
+        syncReminders()
+    }
+
+    fun setReminder(h: Habit, minute: Int?) = launchSafely {
+        repo.putHabit(h.copy(reminderMinute = minute))
+        syncReminders()
+    }
+
+    /** Supplement reminders live with the other reminders, so one alarm serves them all. */
+    private suspend fun syncReminders() {
+        val all = repo.habits.first()
+        val times = io.github.randomtools3377.fitness.core.ReminderSettings.supplementTimes(all)
+        repo.updateSettings { it.copy(reminders = it.reminders.copy(supplements = times)) }
+        io.github.randomtools3377.fitness.reminders.ReminderScheduler.schedule(getApplication(), repo.settingsOnce().reminders)
+    }
+
+    // Cycle tracking (0.12.0).
+
+    val periods: StateFlow<List<io.github.randomtools3377.fitness.core.Period>> = repo.periods.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun setCycleOn(on: Boolean) = launchSafely { repo.updateSettings { it.copy(cycleOn = on) } }
+
+    fun startPeriod(day: LocalDate) = launchSafely {
+        io.github.randomtools3377.fitness.core.Cycle.problem(day, null, today())?.let { throw IllegalArgumentException(it) }
+        require(periods.value.none { it.end == null }) { "A period is already going. Mark its last day first." }
+        repo.putPeriod(io.github.randomtools3377.fitness.core.Period(start = day))
+    }
+
+    fun endPeriod(p: io.github.randomtools3377.fitness.core.Period, day: LocalDate) = launchSafely {
+        io.github.randomtools3377.fitness.core.Cycle.problem(p.start, day, today())?.let { throw IllegalArgumentException(it) }
+        repo.putPeriod(p.copy(end = day))
+    }
+
+    fun deletePeriod(id: Long) = launchSafely { repo.deletePeriod(id) }
 
     fun tick(h: Habit, day: LocalDate, done: Boolean) = launchSafely { repo.tickHabit(h.id, day, done) }
 

@@ -412,6 +412,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setTheme(t: io.github.randomtools3377.fitness.core.ThemeSettings) = launchSafely { repo.updateSettings { it.copy(theme = t) } }
 
+    /** Periods, for marking the weight chart (0.12.0). */
+    val periods: StateFlow<List<io.github.randomtools3377.fitness.core.Period>> = repo.periods.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun setCycleOn(on: Boolean) = launchSafely { repo.updateSettings { it.copy(cycleOn = on) } }
+
     fun setWorkoutsPerWeek(n: Int) = launchSafely {
         require(n in 1..14) { "Choose between 1 and 14 workouts a week." }
         repo.updateSettings { it.copy(workoutsPerWeek = n) }

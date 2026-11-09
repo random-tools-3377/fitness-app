@@ -60,4 +60,20 @@ class BodyTest {
         app.waitFor { !gone("latest:BODY_FAT") }
         app.waitFor { contains("latest:BODY_FAT", "25 %") }
     }
+
+    @Test
+    fun aSupplementIsAddedAndTickedInTheDiary() {
+        app.waitFor { !gone("diary-list") }
+        app.onNodeWithTag("nav:progress").performClick()
+        app.onNodeWithTag("progress:habits").performClick()
+        app.waitFor { !gone("habits-list") }
+        app.tapIn("habits-list", "field:supplement")
+        app.onNodeWithTag("field:supplement").performTextInput("Test vitamin")
+        app.tap("add-supplement")
+        app.waitFor { app.shownIn("habits-list", "supplement:Test vitamin") }
+
+        app.onNodeWithTag("nav:diary").performClick()
+        app.waitFor { !gone("diary-list") }
+        app.tapIn("diary-list", "tick:Test vitamin")
+    }
 }
