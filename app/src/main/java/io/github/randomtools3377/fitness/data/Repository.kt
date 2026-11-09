@@ -33,6 +33,7 @@ import kotlinx.datetime.LocalDate
 /** Everything the screens read and change, in terms of the shared models. */
 class Repository(private val context: Context, val db: AppDatabase) {
     private val dao = db.dao()
+    private val well = db.wellbeingDao()
 
     // Built-in foods: read from the app's own file the first time they are needed.
     private val builtInLock = Mutex()
@@ -179,6 +180,36 @@ class Repository(private val context: Context, val db: AppDatabase) {
     suspend fun addWater(day: LocalDate, ml: Int, now: Long) = dao.insertWater(listOf(WaterRow(day = day.toDay(), ml = ml, at = now)))
     suspend fun undoWater(day: LocalDate) = dao.deleteLastWater(day.toDay())
 
+    // Measurements, sleep and mood, habits and progress photos (0.8.0).
+    val measurements: Flow<List<io.github.randomtools3377.fitness.core.Measurement>> = well.measurements().map { r -> r.map { it.toCore() } }
+    suspend fun addMeasurements(list: List<io.github.randomtools3377.fitness.core.Measurement>) = well.insertMeasurements(list.map { it.toRow() })
+    suspend fun deleteMeasurement(id: Long) = well.deleteMeasurement(id)
+
+    val dayNotes: Flow<List<io.github.randomtools3377.fitness.core.DayNote>> = well.dayNotes().map { r -> r.map { it.toCore() } }
+    suspend fun putDayNote(n: io.github.randomtools3377.fitness.core.DayNote) =
+        if (n.isEmpty) well.deleteDayNote(n.day.toDay()) else well.putDayNotes(listOf(n.toRow()))
+
+    val habits: Flow<List<io.github.randomtools3377.fitness.core.Habit>> = well.habits().map { r -> r.map { it.toCore() } }
+    val habitTicks: Flow<List<io.github.randomtools3377.fitness.core.HabitTick>> = well.habitTicks().map { r -> r.map { it.toCore() } }
+    suspend fun addHabit(h: io.github.randomtools3377.fitness.core.Habit) = well.insertHabit(h.toRow())
+    suspend fun putHabit(h: io.github.randomtools3377.fitness.core.Habit) = well.putHabits(listOf(h.toRow()))
+    suspend fun tickHabit(habitId: Long, day: kotlinx.datetime.LocalDate, done: Boolean) =
+        if (done) well.insertHabitTicks(listOf(HabitTickRow(habitId, day.toDay()))) else well.deleteHabitTick(habitId, day.toDay())
+
+    val photos: Flow<List<PhotoRow>> = well.photos()
+    suspend fun addPhoto(uri: android.net.Uri, day: kotlinx.datetime.LocalDate, now: Long): Long {
+        val name = Photos.keep(context, uri, now)
+        return well.insertPhoto(PhotoRow(day = day.toDay(), file = name, at = now))
+    }
+    suspend fun deletePhoto(id: Long) {
+        well.photo(id)?.let { Photos.delete(context, it.file) }
+        well.deletePhoto(id)
+    }
+    suspend fun savePhotoCopy(id: Long, to: android.net.Uri) {
+        val p = well.photo(id) ?: return
+        Photos.saveCopy(context, p.file, to)
+    }
+
     // Weigh-ins.
     val weighIns: Flow<List<WeighIn>> = dao.weighIns().map { r -> r.map { it.toCore() } }
     suspend fun weighInsOnce(): List<WeighIn> = dao.allWeighIns().map { it.toCore() }
@@ -254,6 +285,10 @@ class Repository(private val context: Context, val db: AppDatabase) {
                 recipes = dao.allRecipes().filter { !it.hidden }.map { it.toCore() },
                 shopping = dao.allShopping().map { it.toCore() },
                 fasts = dao.allFasts().map { it.toCore() },
+                measurements = well.allMeasurements().map { it.toCore() },
+                dayNotes = well.allDayNotes().map { it.toCore() },
+                habits = well.allHabits().map { it.toCore() },
+                habitTicks = well.allHabitTicks().map { it.toCore() },
             )
         }
         return Backup.encode(backup)
@@ -281,6 +316,14 @@ class Repository(private val context: Context, val db: AppDatabase) {
             dao.clearRecipes()
             dao.clearShopping()
             dao.clearFasts()
+            well.clearMeasurements()
+            well.clearDayNotes()
+            well.clearHabitTicks()
+            well.clearHabits()
+            well.insertMeasurements(backup.measurements.map { it.toRow() })
+            well.putDayNotes(backup.dayNotes.map { it.toRow() })
+            well.putHabits(backup.habits.map { it.toRow() })
+            well.insertHabitTicks(backup.habitTicks.map { it.toRow() })
             dao.insertFoods(backup.foods.map { it.toRow(now) })
             dao.insertEntries(backup.entries.map { it.toRow() })
             for (meal in backup.savedMeals) {

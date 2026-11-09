@@ -551,13 +551,16 @@ interface FitnessDao {
         RecipeRow::class, ShoppingRow::class,
         // Version 5 (0.6.0): fasting.
         FastRow::class,
+        // Version 7 (0.8.0): measurements, sleep and mood, habits, progress photos.
+        MeasurementRow::class, DayNoteRow::class, HabitRow::class, HabitTickRow::class, PhotoRow::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
+    abstract fun wellbeingDao(): WellbeingDao
     abstract fun productDao(): ProductDao
 
     companion object {

@@ -33,6 +33,8 @@ data class AppSettings(
     val favourites: Set<String> = emptySet(),
     /** Daily targets for fibre, sugar, saturated fat and salt; off until set (0.7.0). */
     val extraTargets: ExtraTargets = ExtraTargets(),
+    /** The Monday whose weekly check-in the user has seen and closed (0.8.0). */
+    val checkInSeen: kotlinx.datetime.LocalDate? = null,
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -77,12 +79,17 @@ data class Backup(
     val shopping: List<ShoppingItem> = emptyList(),
     /** Fasts (format 3). */
     val fasts: List<Fast> = emptyList(),
+    /** Measurements, sleep and mood, and habits (format 4). Progress photos are never in it. */
+    val measurements: List<Measurement> = emptyList(),
+    val dayNotes: List<DayNote> = emptyList(),
+    val habits: List<Habit> = emptyList(),
+    val habitTicks: List<HabitTick> = emptyList(),
 ) {
     companion object {
         const val APP = "fitness"
 
         /** Raised whenever the file's layout changes in a way older versions can't read. */
-        const val FORMAT = 3
+        const val FORMAT = 4
 
         private val json = Json {
             prettyPrint = true
