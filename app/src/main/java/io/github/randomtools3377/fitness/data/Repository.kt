@@ -267,6 +267,18 @@ class Repository(private val context: Context, val db: AppDatabase) {
         dao.putSetting(SettingRow(SETTINGS_KEY, AppSettings.encode(change(settingsOnce()))))
     }
 
+    /** Spreadsheet files of everything, for reading elsewhere (0.10.0). */
+    suspend fun spreadsheets(tz: kotlinx.datetime.TimeZone): Map<String, String> = db.withTransaction {
+        io.github.randomtools3377.fitness.core.CsvExport.all(
+            entries = dao.allEntries().map { it.toCore() },
+            weighIns = dao.allWeighIns().map { it.toCore() },
+            measurements = well.allMeasurements().map { it.toCore() },
+            workouts = workoutsOf(dao.allWorkouts(), dao.allWorkoutSets()),
+            notes = well.allDayNotes().map { it.toCore() },
+            tz = tz,
+        )
+    }
+
     // Export and import.
     suspend fun export(now: Long): String {
         val backup = db.withTransaction {

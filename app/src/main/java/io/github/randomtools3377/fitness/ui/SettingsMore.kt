@@ -328,3 +328,17 @@ fun PlatesRow(vm: MainViewModel, settings: AppSettings) {
         ) { Text("Save the bar and plates") }
     }
 }
+
+/** Light or dark, and the accent colour (0.10.0). */
+@Composable
+fun ThemeSection(vm: MainViewModel, settings: AppSettings) {
+    val t = settings.theme
+    Section("Look") {
+        Choices(io.github.randomtools3377.fitness.core.ThemeMode.entries, t.mode, { it.title }, { "theme:${it.name}" }) { vm.setTheme(t.copy(mode = it)) }
+        Text("Colour", style = MaterialTheme.typography.labelLarge)
+        val accents = io.github.randomtools3377.fitness.core.Accent.entries.filter {
+            it != io.github.randomtools3377.fitness.core.Accent.WALLPAPER || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        }
+        Choices(accents, t.accent, { it.title }, { "accent:${it.name}" }) { vm.setTheme(t.copy(accent = it)) }
+    }
+}

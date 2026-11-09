@@ -343,6 +343,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         message.value = "Saved"
     }
 
+    fun setTheme(t: io.github.randomtools3377.fitness.core.ThemeSettings) = launchSafely { repo.updateSettings { it.copy(theme = t) } }
+
     fun setWorkoutsPerWeek(n: Int) = launchSafely {
         require(n in 1..14) { "Choose between 1 and 14 workouts a week." }
         repo.updateSettings { it.copy(workoutsPerWeek = n) }
@@ -596,6 +598,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setUnits(u: UnitSettings?) = launchSafely { repo.updateSettings { it.copy(units = u) } }
 
     // Export and import.
+
+    /** The diary, weigh-ins, measurements, workouts and sleep as spreadsheets (CSV) in one zip file (0.10.0). */
+    fun exportSpreadsheets(uri: Uri) = viewModelScope.launch {
+        try {
+            val files = repo.spreadsheets(TimeZone.currentSystemDefault())
+            withContext(Dispatchers.IO) {
+                java.util.zip.ZipOutputStream(resolver.openOutputStream(uri, "wt")!!).use { zip ->
+                    for ((name, text) in files) {
+                        zip.putNextEntry(java.util.zip.ZipEntry(name))
+                        // A byte-order mark, so spreadsheet apps read the accents right.
+                        zip.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+                        zip.write(text.toByteArray(Charsets.UTF_8))
+                        zip.closeEntry()
+                    }
+                }
+            }
+            message.value = "Saved ${files.size} spreadsheets"
+        } catch (e: Exception) {
+            message.value = "The file could not be written."
+        }
+    }
 
     fun exportTo(uri: Uri) = viewModelScope.launch {
         try {

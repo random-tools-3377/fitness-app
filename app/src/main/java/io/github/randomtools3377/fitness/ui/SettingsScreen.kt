@@ -71,6 +71,9 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) vm.exportTo(uri)
     }
+    val sheetsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) vm.exportSpreadsheets(uri)
+    }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             vm.readBackup(uri).fold(onSuccess = { importing = it }, onFailure = { importError = it.message })
@@ -109,6 +112,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
             PlatesRow(vm, settings)
         }
 
+        ThemeSection(vm, settings)
         RemindersSection(vm, settings)
         PrivacySection(vm, settings)
 
@@ -141,6 +145,15 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
                     Text("Import")
                 }
             }
+            Text(
+                "To look at your data in a spreadsheet app: the diary, weigh-ins, measurements, workouts and sleep, " +
+                    "as spreadsheet (CSV) files in one zip file. These can't be imported back; use Export for that.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedButton(
+                onClick = { sheetsLauncher.launch(io.github.randomtools3377.fitness.core.CsvExport.fileName(vm.today())) },
+                modifier = Modifier.testTag("export-spreadsheets"),
+            ) { Text("Save as spreadsheets") }
         }
 
         AutoBackupSection(vm)

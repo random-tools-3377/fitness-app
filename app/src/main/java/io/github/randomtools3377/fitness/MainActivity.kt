@@ -8,6 +8,8 @@ import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
 import io.github.randomtools3377.fitness.ui.FitnessApp
 import io.github.randomtools3377.fitness.ui.FitnessTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import io.github.randomtools3377.fitness.ui.BodyViewModel
 import io.github.randomtools3377.fitness.ui.MainViewModel
 import io.github.randomtools3377.fitness.ui.StatsViewModel
@@ -26,7 +28,8 @@ class MainActivity : FragmentActivity() {
         Privacy.apply(this)
         handle(intent)
         setContent {
-            FitnessTheme {
+            val settings by vm.settings.collectAsState()
+            FitnessTheme(settings.theme) {
                 FitnessApp(vm, wvm, svm, bvm)
             }
         }
