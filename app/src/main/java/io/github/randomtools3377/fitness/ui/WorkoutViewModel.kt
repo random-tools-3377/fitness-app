@@ -40,6 +40,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun now(): Long = Clock.System.now().toEpochMilliseconds()
     private fun today(): LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault())
+    fun todayDate(): LocalDate = today()
 
     val message = MutableStateFlow<String?>(null)
 
@@ -182,7 +183,43 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         val beaten = Bests.beaten(finishedBefore() + sofar, we.exercise, doneSet, w.day)
         updateSet(index, setIndex) { doneSet }
         if (beaten.isNotEmpty()) celebration.value = beaten
-        if (we.exercise.kind != ExerciseKind.CARDIO) RestTimer.start(context, restFor(we.exercise.key), we.exercise.name)
+        // In a superset, the rest comes after the last exercise of the round (0.9.0).
+        if (we.exercise.kind != ExerciseKind.CARDIO && io.github.randomtools3377.fitness.core.Supersets.restAfter(w, index)) {
+            RestTimer.start(context, restFor(we.exercise.key), we.exercise.name)
+        }
+    }
+
+    /** Marks a set as a warm-up, or back to a working set (0.9.0). */
+    fun toggleWarmUp(index: Int, setIndex: Int) = updateSet(index, setIndex) { it.copy(warmUp = !it.warmUp) }
+
+    fun joinSuperset(index: Int) = change { w -> io.github.randomtools3377.fitness.core.Supersets.joinWithNext(w, index) }
+
+    fun leaveSuperset(index: Int) = change { w -> io.github.randomtools3377.fitness.core.Supersets.leave(w, index) }
+
+    /** "Try a bit more", from the last time the exercise was done. */
+    fun hint(e: io.github.randomtools3377.fitness.core.Exercise): io.github.randomtools3377.fitness.core.Hint? =
+        io.github.randomtools3377.fitness.core.Progression.hint(e, io.github.randomtools3377.fitness.core.Workouts.lastTime(e.key, finishedBefore()), units.value.weight)
+
+    fun applyHint(index: Int, h: io.github.randomtools3377.fitness.core.Hint) = change { w ->
+        w.copy(exercises = w.exercises.mapIndexed { i, we -> if (i == index) io.github.randomtools3377.fitness.core.Progression.apply(we, h) else we })
+    }
+
+    /** Starts today's workout from the weekly programme. */
+    fun startToday(): Boolean {
+        val sw = io.github.randomtools3377.fitness.core.Programme.today(programme.value, saved.value, today()) ?: return false
+        startSaved(sw)
+        return true
+    }
+
+    val programme: StateFlow<Map<Int, Long>> = repo.settings.map { it.programme }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val plates: StateFlow<io.github.randomtools3377.fitness.core.PlateSettings> = repo.settings.map { it.plates }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.randomtools3377.fitness.core.PlateSettings())
+
+    fun setProgramme(p: Map<Int, Long>) = viewModelScope.launch { repo.updateSettings { it.copy(programme = p) } }
+
+    fun setPlates(p: io.github.randomtools3377.fitness.core.PlateSettings) = viewModelScope.launch {
+        repo.updateSettings { it.copy(plates = p) }
+        message.value = "Saved"
     }
 
     fun setRest(key: String, seconds: Int) = viewModelScope.launch {

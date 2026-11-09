@@ -230,6 +230,9 @@ data class WorkoutSetRow(
     val distanceKm: Double?,
     val done: Boolean,
     val doneAt: Long?,
+    /** Version 8 (0.9.0): a warm-up set, and the exercise's superset. */
+    @androidx.room.ColumnInfo(defaultValue = "0") val warmUp: Boolean = false,
+    val superset: Int? = null,
 )
 
 @Entity(tableName = "saved_workouts")
@@ -255,6 +258,8 @@ data class SavedWorkoutItemRow(
     val muscle: String,
     val cardio: String,
     val sets: Int,
+    /** Version 8 (0.9.0): the exercise's superset. */
+    val superset: Int? = null,
 )
 
 /** How often and how lately each food was logged. */
@@ -554,9 +559,9 @@ interface FitnessDao {
         // Version 7 (0.8.0): measurements, sleep and mood, habits, progress photos.
         MeasurementRow::class, DayNoteRow::class, HabitRow::class, HabitTickRow::class, PhotoRow::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
@@ -636,7 +641,8 @@ fun workoutsOf(rows: List<WorkoutRow>, sets: List<WorkoutSetRow>): List<Workout>
             val f = list.first()
             WorkoutExercise(
                 exerciseOf(f.exerciseKey, f.exerciseName, f.kind, f.met, f.muscle, f.cardio),
-                list.sortedBy { it.setIndex }.map { WorkoutSet(it.weightKg, it.reps, it.seconds, it.distanceKm, it.done, it.doneAt) },
+                list.sortedBy { it.setIndex }.map { WorkoutSet(it.weightKg, it.reps, it.seconds, it.distanceKm, it.done, it.doneAt, it.warmUp) },
+                f.superset,
             )
         }
         Workout(r.id, r.name, dayOf(r.day), r.startedAt, r.endedAt, exercises, r.savedWorkoutId, r.burnedKcal)
@@ -652,6 +658,7 @@ fun Workout.setRows(workoutId: Long): List<WorkoutSetRow> = exercises.flatMapInd
             exerciseKey = we.exercise.key, exerciseName = we.exercise.name, kind = we.exercise.kind.name, met = we.exercise.met,
             muscle = we.exercise.muscle, cardio = we.exercise.cardio.name,
             weightKg = s.weightKg, reps = s.reps, seconds = s.seconds, distanceKm = s.distanceKm, done = s.done, doneAt = s.doneAt,
+            warmUp = s.warmUp, superset = we.superset,
         )
     }
 }
@@ -662,7 +669,7 @@ fun savedWorkoutsOf(rows: List<SavedWorkoutRow>, items: List<SavedWorkoutItemRow
         SavedWorkout(
             r.id, r.name,
             bySaved[r.id].orEmpty().sortedBy { it.position }.map {
-                SavedWorkoutItem(exerciseOf(it.exerciseKey, it.exerciseName, it.kind, it.met, it.muscle, it.cardio), it.sets)
+                SavedWorkoutItem(exerciseOf(it.exerciseKey, it.exerciseName, it.kind, it.met, it.muscle, it.cardio), it.sets, it.superset)
             },
             r.createdAt,
         )
@@ -672,7 +679,7 @@ fun savedWorkoutsOf(rows: List<SavedWorkoutRow>, items: List<SavedWorkoutItemRow
 fun SavedWorkout.itemRows(savedId: Long) = items.mapIndexed { i, it ->
     SavedWorkoutItemRow(
         savedId = savedId, position = i, exerciseKey = it.exercise.key, exerciseName = it.exercise.name, kind = it.exercise.kind.name,
-        met = it.exercise.met, muscle = it.exercise.muscle, cardio = it.exercise.cardio.name, sets = it.sets,
+        met = it.exercise.met, muscle = it.exercise.muscle, cardio = it.exercise.cardio.name, sets = it.sets, superset = it.superset,
     )
 }
 

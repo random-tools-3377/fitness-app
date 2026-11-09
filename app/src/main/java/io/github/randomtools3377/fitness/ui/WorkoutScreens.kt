@@ -89,6 +89,8 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
     val exercises by wvm.exercises.collectAsState()
     var cardio by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<Workout?>(null) }
+    var planning by remember { mutableStateOf(false) }
+    val programme by wvm.programme.collectAsState()
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     val context = LocalContext.current
@@ -114,6 +116,27 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
             }
         }
         if (active == null) {
+            // Today's workout from the weekly programme (0.9.0).
+            val todays = io.github.randomtools3377.fitness.core.Programme.today(programme, saved, wvm.todayDate())
+            item {
+                Section("Weekly programme") {
+                    if (programme.isEmpty()) {
+                        Text("Plan which saved workout to do on which days, like Push on Monday and Legs on Friday.", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        Text(io.github.randomtools3377.fitness.core.Programme.describe(programme, saved), style = MaterialTheme.typography.bodySmall)
+                        if (todays != null) {
+                            Button(onClick = { beforeStart(); wvm.startSaved(todays); open(Route.ActiveWorkout) }, modifier = Modifier.testTag("start-today")) {
+                                Text("Today: start ${todays.name}")
+                            }
+                        } else {
+                            Text("Nothing planned today: a rest day.", modifier = Modifier.testTag("rest-day"))
+                        }
+                    }
+                    TextButton(onClick = { planning = true }, enabled = saved.isNotEmpty(), modifier = Modifier.testTag("edit-programme")) {
+                        Text(if (saved.isEmpty()) "Save a workout first to plan a week" else if (programme.isEmpty()) "Plan my week" else "Change the plan")
+                    }
+                }
+            }
             item {
                 Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { beforeStart(); wvm.startEmpty(); open(Route.ActiveWorkout) }, modifier = Modifier.testTag("start-empty")) {
@@ -183,6 +206,7 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
         )
     }
     viewing?.let { w -> WorkoutDetailsDialog(w, units, wvm, onDismiss = { viewing = null }) }
+    if (planning) ProgrammeDialog(saved, programme, onSave = { wvm.setProgramme(it); planning = false }, onDismiss = { planning = false })
 }
 
 private fun summary(w: Workout, u: UnitSettings): String {
@@ -266,6 +290,7 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     var renaming by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var restFor by remember { mutableStateOf<Exercise?>(null) }
+    var platesFor by remember { mutableStateOf<Int?>(null) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val context = LocalContext.current
 
@@ -321,7 +346,26 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                                 )
                             }
                         }
+                        ExerciseMenu(w, i, we, wvm, onPlates = { platesFor = i })
                         IconButton(onClick = { wvm.removeExercise(i) }) { Icon(Icons.Filled.Close, contentDescription = "Remove exercise") }
+                    }
+                    we.superset?.let { g ->
+                        Text(
+                            "Superset ${('A' + (g - 1) % 26)}: do one set of each in turn, then rest",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.testTag("superset:$i"),
+                        )
+                    }
+                    // "Try a bit more" (0.9.0), until a set is ticked.
+                    if (we.sets.none { it.done }) {
+                        val h = remember(we.exercise.key, w.id) { wvm.hint(we.exercise) }
+                        if (h != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(h.text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).testTag("hint:$i"))
+                                TextButton(onClick = { wvm.applyHint(i, h) }, modifier = Modifier.testTag("use-hint:$i")) { Text("Use it") }
+                            }
+                        }
                     }
                     SetHeader(we.exercise.kind, units)
                     we.sets.forEachIndexed { j, s -> SetRow(w.id, i, j, we.exercise.kind, s, units, wvm, "${w.exercises.size}:${we.sets.size}") }
@@ -372,6 +416,11 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
             confirmButton = { TextButton(onClick = { wvm.rename(name); renaming = false }, enabled = name.isNotBlank()) { Text("Save") } },
             dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
         )
+    }
+    platesFor?.let { idx ->
+        val we = w.exercises.getOrNull(idx)
+        val firstOpen = we?.sets?.firstOrNull { !it.done && !it.warmUp }?.weightKg ?: we?.sets?.firstOrNull()?.weightKg
+        PlatesDialog(wvm, units, firstOpen, onDismiss = { platesFor = null })
     }
     restFor?.let { e ->
         var text by remember(e.key) { mutableStateOf(((restTimes[e.key] ?: Exercises.DEFAULT_REST_SECONDS)).toString()) }
@@ -438,7 +487,12 @@ private fun SetRow(workoutId: Long, i: Int, j: Int, kind: ExerciseKind, s: Worko
     // Changes when sets or exercises are added or removed, so the boxes are filled in afresh.
     val key = "$workoutId:$i:$j:$shape"
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("${j + 1}", Modifier.width(36.dp), color = if (s.done) MaterialTheme.colorScheme.outline else Color.Unspecified)
+        // Tap the number to mark a warm-up set (0.9.0), shown as W.
+        Text(
+            if (s.warmUp) "W" else "${j + 1}",
+            Modifier.width(36.dp).clickable { wvm.toggleWarmUp(i, j) }.testTag("warmup:$i:$j"),
+            color = if (s.done) MaterialTheme.colorScheme.outline else if (s.warmUp) MaterialTheme.colorScheme.tertiary else Color.Unspecified,
+        )
         when (kind) {
             ExerciseKind.WEIGHTS -> {
                 SetField(s.weightKg?.let { formatAmount(Units.kgToShown(it, units.weight)) } ?: "", "field:weight:$i:$j", "$key:w", true, Modifier.weight(1f)) { t ->
@@ -553,4 +607,89 @@ fun BestsScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> Unit) {
             }
         }
     }
+}
+
+/** The exercise's ⋮ menu: supersets and, for weights, the plate calculator (0.9.0). */
+@Composable
+private fun ExerciseMenu(w: Workout, i: Int, we: io.github.randomtools3377.fitness.core.WorkoutExercise, wvm: WorkoutViewModel, onPlates: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, modifier = Modifier.testTag("exercise-menu:$i")) { Icon(Icons.Filled.MoreVert, contentDescription = "More") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (i < w.exercises.lastIndex) {
+                DropdownMenuItem(
+                    text = { Text("Superset with the next exercise") },
+                    onClick = { open = false; wvm.joinSuperset(i) },
+                    modifier = Modifier.testTag("join-superset:$i"),
+                )
+            }
+            if (we.superset != null) {
+                DropdownMenuItem(text = { Text("Take out of the superset") }, onClick = { open = false; wvm.leaveSuperset(i) }, modifier = Modifier.testTag("leave-superset:$i"))
+            }
+            if (we.exercise.kind == ExerciseKind.WEIGHTS) {
+                DropdownMenuItem(text = { Text("Plate calculator") }, onClick = { open = false; onPlates() }, modifier = Modifier.testTag("plates:$i"))
+            }
+            DropdownMenuItem(text = { Text("Tap a set's number to mark it a warm-up") }, onClick = { open = false }, enabled = false)
+        }
+    }
+}
+
+/** Which plates go on each side of the bar for a weight (0.9.0). */
+@Composable
+fun PlatesDialog(wvm: WorkoutViewModel, units: UnitSettings, initialKg: Double?, onDismiss: () -> Unit) {
+    val plates by wvm.plates.collectAsState()
+    val lb = units.weight == io.github.randomtools3377.fitness.core.WeightUnit.LB
+    var text by remember { mutableStateOf(initialKg?.let { formatAmount(Math.round(Units.kgToShown(it, units.weight) * 100) / 100.0) }.orEmpty()) }
+    val bar = if (lb) plates.barLb else plates.barKg
+    val list = if (lb) plates.platesLb else plates.platesKg
+    val unit = units.weight.short
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Plate calculator") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(text, { text = it }, "Weight on the bar, in total", "field:plates-total", Modifier.fillMaxWidth(), suffix = unit)
+                val total = Units.parse(text)
+                if (total != null) {
+                    val l = io.github.randomtools3377.fitness.core.Plates.load(total, bar, list)
+                    if (l == null) {
+                        Text("That's less than the bar (${formatAmount(bar)} $unit).")
+                    } else {
+                        Text("On each side: ${io.github.randomtools3377.fitness.core.Plates.describe(l)}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("plates-per-side"))
+                        if (!l.exact) Text("${formatAmount(l.left)} $unit can't be made with your plates.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Text("Bar ${formatAmount(bar)} $unit; plates ${list.joinToString(", ") { formatAmount(it) }} $unit. Change them in Settings → Workouts.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
+}
+
+/** Picking a saved workout for each day of the week, or none (0.9.0). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ProgrammeDialog(saved: List<SavedWorkout>, current: Map<Int, Long>, onSave: (Map<Int, Long>) -> Unit, onDismiss: () -> Unit) {
+    val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    val plan = remember { androidx.compose.runtime.mutableStateMapOf<Int, Long>().apply { putAll(current) } }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Your week") },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                days.forEachIndexed { i, name ->
+                    val d = i + 1
+                    Text(name, style = MaterialTheme.typography.labelLarge)
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        androidx.compose.material3.FilterChip(selected = plan[d] == null, onClick = { plan.remove(d) }, label = { Text("Rest") }, modifier = Modifier.testTag("prog:$d:rest"))
+                        for (sw in saved) {
+                            androidx.compose.material3.FilterChip(selected = plan[d] == sw.id, onClick = { plan[d] = sw.id }, label = { Text(sw.name) }, modifier = Modifier.testTag("prog:$d:${sw.name}"))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(plan.toMap()) }, modifier = Modifier.testTag("save-programme")) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
