@@ -74,10 +74,10 @@ fun WeightScreen(vm: MainViewModel, modifier: Modifier) {
                     Text("The chart appears after two weigh-ins.", style = MaterialTheme.typography.bodyMedium)
                 } else {
                     WeightChart(weighIns, toShown = { Units.kgToShown(it, units.weight) }, periodDays = if (settings.cycleOn) periodDays else emptySet())
-                    if (settings.cycleOn && periodDays.isNotEmpty()) Legend(MaterialTheme.colorScheme.tertiaryContainer, "Period days")
+                    if (settings.cycleOn && periodDays.isNotEmpty()) Legend(LocalChartColors.current.shade, "Period days")
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Legend(MaterialTheme.colorScheme.outline, "Weigh-ins")
-                        Legend(MaterialTheme.colorScheme.primary, "7-day average")
+                        Legend(LocalChartColors.current.dots, "Weigh-ins")
+                        Legend(LocalChartColors.current.main, "7-day average")
                     }
                     Text(
                         "Weight goes up and down from day to day with water and food. The average line shows the trend.",
@@ -120,11 +120,11 @@ private fun Legend(color: Color, text: String) {
 /** Weigh-ins as dots and the 7-day average as a line, drawn by the app itself. */
 @Composable
 private fun WeightChart(weighIns: List<WeighIn>, toShown: (Double) -> Double, periodDays: Set<LocalDate> = emptySet()) {
-    val shade = MaterialTheme.colorScheme.tertiaryContainer
+    val shade = LocalChartColors.current.shade
     val daily = Weight.daily(weighIns)
     val average = Weight.sevenDayAverage(weighIns)
-    val dots = MaterialTheme.colorScheme.outline
-    val line = MaterialTheme.colorScheme.primary
+    val dots = LocalChartColors.current.dots
+    val line = LocalChartColors.current.main
     val grid = MaterialTheme.colorScheme.outlineVariant
     val first = daily.first().first.toEpochDays()
     val last = daily.last().first.toEpochDays()

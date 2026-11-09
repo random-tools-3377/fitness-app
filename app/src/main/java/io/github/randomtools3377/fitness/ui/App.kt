@@ -184,8 +184,12 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
                         }
                         Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                             Choices(
-                                listOf("stats", "weight", "body", "habits"), progressPart,
-                                { when (it) { "stats" -> "Stats"; "weight" -> "Weight"; "body" -> "Body"; else -> "Habits" } },
+                                listOf("stats", "weight", "body", "habits", "calendar", "year"), progressPart,
+                                {
+                                    when (it) {
+                                        "stats" -> "Stats"; "weight" -> "Weight"; "body" -> "Body"; "habits" -> "Habits"; "calendar" -> "Calendar"; else -> "Year"
+                                    }
+                                },
                                 { "progress:$it" },
                             ) { progressPart = it }
                         }
@@ -193,6 +197,8 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
                             "stats" -> StatsScreen(svm, Modifier)
                             "weight" -> WeightScreen(vm, Modifier)
                             "body" -> MeasurementsScreen(bvm, Modifier)
+                            "calendar" -> CalendarScreen(svm, Modifier)
+                            "year" -> YearReviewScreen(svm, Modifier)
                             else -> {
                                 val entries by svm.entries.collectAsState()
                                 val kcalByDay = remember(entries) {

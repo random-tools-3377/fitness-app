@@ -16,7 +16,14 @@ enum class ThemeMode(val title: String) { SYSTEM("Follow the phone"), LIGHT("Lig
 enum class Accent(val title: String) { WALLPAPER("Phone's colours"), TERRACOTTA("Terracotta"), GREEN("Green"), BLUE("Blue"), PURPLE("Purple") }
 
 @Serializable
-data class ThemeSettings(val mode: ThemeMode = ThemeMode.SYSTEM, val accent: Accent = Accent.WALLPAPER)
+data class ThemeSettings(
+    val mode: ThemeMode = ThemeMode.SYSTEM,
+    val accent: Accent = Accent.WALLPAPER,
+    /** Text size on top of the phone's own: 1, 1.15 or 1.3 (0.14.0). */
+    val textScale: Float = 1f,
+    /** Chart colours that don't rely on telling red from green (0.14.0). */
+    val colourBlind: Boolean = false,
+)
 
 /** A stretch of steps the phone counted, from Health Connect (0.10.0). Times in epoch milliseconds. */
 data class StepCount(val start: Long, val end: Long, val count: Long)

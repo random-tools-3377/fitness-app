@@ -212,9 +212,10 @@ fun StatsScreen(svm: StatsViewModel, modifier: Modifier) {
 /** Bars, drawn by the app itself, with an optional dashed target line. */
 @Composable
 fun BarChart(values: List<Double>, target: Double?) {
-    val bar = MaterialTheme.colorScheme.primary
-    val over = MaterialTheme.colorScheme.tertiary
-    val line = MaterialTheme.colorScheme.secondary
+    val chart = LocalChartColors.current
+    val bar = chart.main
+    val over = chart.over
+    val line = chart.line
     val top = maxOf(values.maxOrNull() ?: 0.0, target ?: 0.0).coerceAtLeast(1.0) * 1.1
     Canvas(Modifier.fillMaxWidth().height(110.dp).padding(vertical = 4.dp)) {
         val n = values.size.coerceAtLeast(1)

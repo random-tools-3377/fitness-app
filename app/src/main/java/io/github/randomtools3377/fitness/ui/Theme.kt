@@ -75,5 +75,30 @@ fun FitnessTheme(theme: io.github.randomtools3377.fitness.core.ThemeSettings = i
         val (light, darkScheme) = schemes(theme.accent)
         if (dark) darkScheme else light
     }
-    MaterialTheme(colorScheme = colors, content = content)
+    val chart = if (theme.colourBlind) {
+        // Okabe–Ito colours: told apart with any kind of colour blindness (0.14.0).
+        ChartColors(
+            main = Color(0xFF0072B2), over = Color(0xFFE69F00), under = Color(0xFF56B4E9), good = Color(0xFF0072B2),
+            line = if (dark) Color(0xFFF0F0F0) else Color(0xFF000000), dots = Color(0xFF999999), shade = Color(0x55CC79A7),
+        )
+    } else {
+        ChartColors(
+            main = colors.primary, over = colors.tertiary, under = colors.secondaryContainer, good = colors.secondary,
+            line = colors.secondary, dots = colors.outline, shade = colors.tertiaryContainer,
+        )
+    }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalChartColors provides chart,
+        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, density.fontScale * theme.textScale),
+    ) {
+        MaterialTheme(colorScheme = colors, content = content)
+    }
+}
+
+/** The colours charts draw with: the theme's, or colour-blind-friendly ones (0.14.0). */
+data class ChartColors(val main: Color, val over: Color, val under: Color, val good: Color, val line: Color, val dots: Color, val shade: Color)
+
+val LocalChartColors = androidx.compose.runtime.staticCompositionLocalOf {
+    ChartColors(Color(0xFFB5462F), Color(0xFF7A5900), Color(0xFFC0F0A4), Color(0xFF3F6A2B), Color(0xFF3F6A2B), Color(0xFF857370), Color(0xFFFFDAD2))
 }
