@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,6 +56,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /** Everything the stats and streaks need, read from the whole diary. */
 class StatsViewModel(app: Application) : AndroidViewModel(app) {
@@ -153,6 +155,11 @@ fun StatsScreen(svm: StatsViewModel, modifier: Modifier) {
             Text("Average ${macroLine(p.average)}", style = MaterialTheme.typography.bodySmall)
         }
 
+        // A few sentences about the week, written on the phone by the optional AI (0.18.0).
+        if (period == StatsPeriod.WEEK && on(io.github.randomtools3377.fitness.core.Feature.AI_SUMMARY)) {
+            WeekInWordsCard(p, settings, water, weighIns, units)
+        }
+
         if (p.topFoods.isNotEmpty()) {
             Section("Most calories") {
                 for ((name, kcal) in p.topFoods) LabelValue(name, energy(kcal, units))
@@ -230,5 +237,82 @@ fun BarChart(values: List<Double>, target: Double?) {
             val y = size.height - (target / top).toFloat() * size.height
             drawLine(line, Offset(0f, y), Offset(size.width, y), strokeWidth = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
         }
+    }
+}
+
+/** The week in a few plain sentences, written on the phone by the optional AI from the numbers above (0.18.0). */
+@Composable
+private fun WeekInWordsCard(
+    p: io.github.randomtools3377.fitness.core.PeriodStats,
+    settings: AppSettings,
+    water: List<WaterEntry>,
+    weighIns: List<WeighIn>,
+    units: UnitSettings,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var words by rememberSaveable(p.from) { mutableStateOf<String?>(null) }
+    var working by remember { mutableStateOf(false) }
+    var problem by remember { mutableStateOf<String?>(null) }
+    val workoutsOn = on(io.github.randomtools3377.fitness.core.Feature.WORKOUTS)
+    val waterOn = on(io.github.randomtools3377.fitness.core.Feature.WATER)
+    Section("The week in words") {
+        val facts = remember(p, settings, water, weighIns, workoutsOn, waterOn) {
+            val target = settings.targetKcal
+            val waterDays = water.filter { it.day in p.from..p.to }.groupBy { it.day }.count { (_, l) -> l.sumOf { it.ml } >= settings.water.targetMl }
+            val week = weighIns.filter { it.day in p.from..p.to }.sortedBy { it.day }
+            val weight = if (week.size >= 2) {
+                val change = week.last().kg - week.first().kg
+                "${Units.weight(week.first().kg, units.weight)} on ${week.first().day}, ${Units.weight(week.last().kg, units.weight)} on ${week.last().day} " +
+                    "(${if (change <= 0) "down" else "up"} ${Units.weight(kotlin.math.abs(change), units.weight)})"
+            } else {
+                null
+            }
+            io.github.randomtools3377.fitness.core.AiText.weekFacts(
+                from = p.from.toString(), to = p.to.toString(),
+                daysLogged = p.daysLogged,
+                avgKcal = p.average.kcal.takeIf { p.daysLogged > 0 }?.let { Units.kcalToShown(it, units.energy).roundToInt() },
+                targetKcal = target?.let { Units.kcalToShown(it.toDouble(), units.energy).roundToInt() },
+                daysOnTarget = p.daysOnTarget.takeIf { target != null },
+                avgProtein = p.average.protein.takeIf { p.daysLogged > 0 }?.roundToInt(),
+                targetProtein = target?.let { settings.macros.grams(it).protein.roundToInt() },
+                workouts = p.workouts.takeIf { workoutsOn },
+                workoutGoal = settings.workoutsPerWeek.takeIf { workoutsOn },
+                waterDays = waterDays.takeIf { waterOn },
+                weightChange = weight,
+                energyUnit = units.energy.short,
+            )
+        }
+        when {
+            p.daysLogged < 3 -> Text("Log food on at least 3 days this week to get a summary.", style = MaterialTheme.typography.bodySmall)
+            words != null -> {
+                Text(words!!, modifier = Modifier.testTag("week-in-words"))
+                Text("Written by the AI on this phone from the numbers on this page. Check it against them.", style = MaterialTheme.typography.bodySmall)
+            }
+            working -> {
+                Text("Writing it… this can take a little while.", style = MaterialTheme.typography.bodySmall)
+                androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+            else -> androidx.compose.material3.OutlinedButton(
+                onClick = {
+                    working = true
+                    problem = null
+                    scope.launch {
+                        try {
+                            words = io.github.randomtools3377.fitness.ai.AiFoods.weekSummary(context, facts)
+                        } catch (e: io.github.randomtools3377.fitness.ai.LocalAi.Unavailable) {
+                            problem = e.message
+                        } catch (e: Throwable) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            problem = "The AI couldn't write it this time. Try again later."
+                        } finally {
+                            working = false
+                        }
+                    }
+                },
+                modifier = Modifier.testTag("week-in-words-write"),
+            ) { Text("Write it") }
+        }
+        problem?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }

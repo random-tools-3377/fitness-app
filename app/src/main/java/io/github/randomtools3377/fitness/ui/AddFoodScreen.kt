@@ -70,6 +70,7 @@ fun AddFoodScreen(
     newFood: (barcode: String?) -> Unit,
     mode: AddMode = AddMode.LOG,
     planDay: kotlinx.datetime.LocalDate? = null,
+    ai: (AiKind) -> Unit = {},
 ) {
     fun add(f: Food, a: Amount) = when (mode) {
         AddMode.LOG -> { vm.log(f, a, meal); Unit }
@@ -134,6 +135,17 @@ fun AddFoodScreen(
             if (on(io.github.randomtools3377.fitness.core.Feature.BARCODES)) OutlinedButton(onClick = scan, modifier = Modifier.testTag("scan")) { Text("Scan") }
             OutlinedButton(onClick = { newFood(null) }, modifier = Modifier.testTag("new-food")) { Text("From a label") }
             if (mode != AddMode.RECIPE) OutlinedButton(onClick = { quick = true }, modifier = Modifier.testTag("quick-add")) { Text("Quick add") }
+        }
+        // The optional on-phone AI (0.18.0 onwards).
+        val describe = on(io.github.randomtools3377.fitness.core.Feature.AI_MEALS)
+        val plate = on(io.github.randomtools3377.fitness.core.Feature.AI_PLATE)
+        if (describe || plate) {
+            Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (describe) OutlinedButton(onClick = { ai(AiKind.DESCRIBE) }, modifier = Modifier.testTag("ai-describe")) {
+                    Text(if (on(io.github.randomtools3377.fitness.core.Feature.AI_VOICE)) "Describe or say it" else "Describe it")
+                }
+                if (plate) OutlinedButton(onClick = { ai(AiKind.PLATE) }, modifier = Modifier.testTag("ai-plate")) { Text("Photo of a plate") }
+            }
         }
         LazyColumn(Modifier.fillMaxSize().testTag("food-list")) {
             if (query.isBlank()) {

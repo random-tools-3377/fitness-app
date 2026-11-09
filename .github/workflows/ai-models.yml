@@ -17,7 +17,7 @@ jobs:
   build:
     name: Build and publish the AI model files
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 120
     permissions:
       contents: write
     steps:
@@ -27,6 +27,9 @@ jobs:
 
       - name: Build the label-reading file
         run: tools/build-ai-labels.sh "$RUNNER_TEMP/ai"
+
+      - name: Build the meals, speech and plate-photo files
+        run: tools/build-ai-models.sh "$RUNNER_TEMP/ai"
 
       - name: Publish on the "ai-models" Release
         env:

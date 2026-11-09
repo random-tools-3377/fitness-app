@@ -1,5 +1,7 @@
 #include "fitness_ai.h"
 
+#include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <vector>

@@ -463,12 +463,14 @@ fun FeaturesScreen(vm: MainViewModel, modifier: Modifier, back: () -> Unit) {
     }
 }
 
-/** The optional on-phone AI parts (0.16.0), apart from the rest: each is off until switched on, and needs its model file. */
+/** The optional on-phone AI parts (0.16.0 onwards), apart from the rest: each is off until switched on, and needs its file. */
 @Composable
 private fun AiSection(vm: MainViewModel, features: Set<io.github.randomtools3377.fitness.core.Feature>) {
     val installed by vm.aiInstalled.collectAsState()
     val installing by vm.aiInstalling.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.installAi(uri) }
+    val ai = io.github.randomtools3377.fitness.core.Feature.entries.filter { it.ai }
     Column(Modifier.fillMaxWidth().padding(top = 16.dp).testTag("ai-section")) {
         Text("AI on this phone", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp))
         Text(
@@ -477,24 +479,42 @@ private fun AiSection(vm: MainViewModel, features: Set<io.github.randomtools3377
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
-        for (f in io.github.randomtools3377.fitness.core.Feature.entries.filter { it.ai }) {
-            val isOn = f in features
-            FeatureRow(f, isOn) { vm.setFeature(f, it) }
-            if (isOn && f == io.github.randomtools3377.fitness.core.Feature.AI_LABELS) {
-                val id = "labels"
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (id in installed) {
-                        Text("The model file is on the phone. Label photos now use it.", style = MaterialTheme.typography.bodySmall)
-                        OutlinedButton(onClick = { vm.removeAi(id) }, modifier = Modifier.testTag("ai-remove:$id")) { Text("Remove the model file") }
-                    } else {
-                        Text(
-                            "One more step: on the phone, open the app's Releases page, find \"AI models\", and download " +
-                                "${io.github.randomtools3377.fitness.ai.AiModels.fileName(id)}. Then open it here. Until then, labels are read the usual way.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Button(onClick = { pick.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }, enabled = !installing, modifier = Modifier.testTag("ai-open:$id")) {
-                            Text(if (installing) "Opening…" else "Open the model file")
-                        }
+        val canRun = io.github.randomtools3377.fitness.ai.LocalAi.supported()
+        if (!canRun) {
+            Text(
+                "This phone can use better label reading, but not the other AI parts: they need a 64-bit phone.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        } else if (io.github.randomtools3377.fitness.ai.LocalAi.lowMemory(context)) {
+            Text(
+                "This phone has little memory for the larger AI parts: they may be slow, or not start. Better label reading is fine.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        for (f in ai) FeatureRow(f, f in features) { vm.setFeature(f, it) }
+        // The files the parts that are on need, each listed once.
+        val needed = ai.filter { it in features }.flatMap { it.models }.distinct()
+        if (needed.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("AI files", style = MaterialTheme.typography.labelLarge)
+                val missing = needed.filter { it !in installed }
+                if (missing.isNotEmpty()) {
+                    Text(
+                        "On the phone, open the app's Releases page, find \"AI models (optional)\", and download " +
+                            missing.joinToString(" and ") { "${io.github.randomtools3377.fitness.ai.AiModels.fileName(it)} (${io.github.randomtools3377.fitness.ai.AiModels.describe(it)})" } +
+                            ". Then open each one here. You can delete the download afterwards.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Button(onClick = { pick.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }, enabled = !installing, modifier = Modifier.testTag("ai-open")) {
+                        Text(if (installing) "Opening… (large files take a few minutes)" else "Open an AI file")
+                    }
+                }
+                for (id in needed.filter { it in installed }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("✓ ${io.github.randomtools3377.fitness.ai.AiModels.describe(id)}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { vm.removeAi(id) }, modifier = Modifier.testTag("ai-remove:$id")) { Text("Remove") }
                     }
                 }
             }

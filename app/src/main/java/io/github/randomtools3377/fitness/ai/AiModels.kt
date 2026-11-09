@@ -16,7 +16,20 @@ object AiModels {
     /** The model files the app knows, by id, with the files each must contain. */
     val KNOWN: Map<String, Set<String>> = mapOf(
         "labels" to setOf("manifest.json", "det.onnx", "rec.onnx", "keys.txt"),
+        // 0.18.0 onwards, run with llama.cpp: meals, recipes and the weekly summary; speech; plate photos.
+        "text" to setOf("manifest.json", "model.gguf"),
+        "speech" to setOf("manifest.json", "model.gguf", "mmproj.gguf"),
+        "plate" to setOf("manifest.json", "model.gguf", "mmproj.gguf"),
     )
+
+    /** What each file is, and about how big, for the Features page. */
+    fun describe(id: String): String = when (id) {
+        "labels" -> "label reading, 27 MB"
+        "text" -> "meals, recipes and summaries, 1.3 GB"
+        "speech" -> "speech, 1 GB"
+        "plate" -> "plate photos, 0.5 GB"
+        else -> id
+    }
 
     /** The file name on the Releases page, to tell the user which one to get. */
     fun fileName(id: String) = "fitness-ai-$id.zip"
@@ -35,10 +48,12 @@ object AiModels {
         val incoming = File(root(context), ".incoming").apply { deleteRecursively(); mkdirs() }
         try {
             val allowed = KNOWN.values.flatten().toSet() + setOf("LICENSE.txt", "MODEL_LICENSES.md", "README.txt")
+            val free = android.os.StatFs(incoming.path).availableBytes
             ZipInputStream(context.contentResolver.openInputStream(uri) ?: throw NotAModelFile("That file could not be opened.")).use { zip ->
                 while (true) {
                     val e = zip.nextEntry ?: break
                     if (e.isDirectory || e.name !in allowed) continue
+                    if (e.size > 0 && e.size > free - 200_000_000L) throw NotAModelFile("There isn't room for it on the phone. It needs about ${e.size / 1_000_000} MB free.")
                     File(incoming, e.name).outputStream().use { zip.copyTo(it) }
                 }
             }

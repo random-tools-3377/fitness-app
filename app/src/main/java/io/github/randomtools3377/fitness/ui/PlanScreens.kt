@@ -233,6 +233,13 @@ private fun RecipeList(vm: MainViewModel, open: (Route) -> Unit) {
                 Button(onClick = { vm.editRecipe(null); open(Route.Recipe) }, modifier = Modifier.testTag("new-recipe")) { Text("New recipe") }
             }
         }
+        if (on(io.github.randomtools3377.fitness.core.Feature.AI_RECIPES)) {
+            item {
+                OutlinedButton(onClick = { open(Route.AiFoods(AiKind.RECIPE)) }, modifier = Modifier.padding(horizontal = 16.dp).testTag("ai-paste-recipe")) {
+                    Text("Paste a recipe")
+                }
+            }
+        }
         items(recipes, key = { it.id }) { r ->
             Column(Modifier.fillMaxWidth().clickable { vm.editRecipe(r); open(Route.Recipe) }.padding(horizontal = 16.dp, vertical = 10.dp).testTag("recipe:${r.name}")) {
                 Text(r.name, style = MaterialTheme.typography.bodyLarge)
