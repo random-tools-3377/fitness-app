@@ -101,14 +101,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val noTargets: (LocalDate) -> Int? = { null }
 
     /** Each day's calorie target: by weekday, on training days, and in a diet break (0.11.0). */
-    val targetFor: StateFlow<(LocalDate) -> Int?> = combine(settings, weighIns, repo.workouts) { s, w, wo ->
+    val targetFor: StateFlow<(LocalDate) -> Int?> = combine(settings, repo.weighIns, repo.workouts) { s, w, wo ->
         io.github.randomtools3377.fitness.core.DayTarget.resolver(
             s, io.github.randomtools3377.fitness.core.Weight.latest(w)?.kg, wo.filter { it.finished }.map { it.day }.toSet(), today().year,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, noTargets)
 
     /** Why the shown day's target differs from the usual one, if it does. */
-    val dayTargetWhy: StateFlow<String?> = combine(day, settings, weighIns, repo.workouts) { d, s, w, wo ->
+    val dayTargetWhy: StateFlow<String?> = combine(day, settings, repo.weighIns, repo.workouts) { d, s, w, wo ->
         io.github.randomtools3377.fitness.core.DayTarget.whyFor(
             s, io.github.randomtools3377.fitness.core.Weight.latest(w)?.kg, wo.filter { it.finished }.map { it.day }.toSet(), today().year, d,
         )
