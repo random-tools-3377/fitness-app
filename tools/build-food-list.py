@@ -39,11 +39,13 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 
-USER_AGENT = "fitness-app-food-list-builder"
+USER_AGENT = "Mozilla/5.0 (compatible; fitness-app-food-list-builder)"
 
 # ---------------------------------------------------------------------------------------------
 # USDA FoodData Central
@@ -93,10 +95,22 @@ CIQUAL_LETTER = "C"
 CIQUAL_TITLE = "CIQUAL (France)"
 
 
-def fetch(url):
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=300) as response:
-        return response.read()
+def fetch(url, tries=5):
+    """Downloads url, trying again a few times when the server is busy."""
+    for attempt in range(1, tries + 1):
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                return response.read()
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 500, 502, 503, 504) or attempt == tries:
+                raise
+            print("  %s answered %d; trying again (%d of %d)" % (url, e.code, attempt + 1, tries))
+        except (urllib.error.URLError, TimeoutError) as e:
+            if attempt == tries:
+                raise
+            print("  %s failed (%s); trying again (%d of %d)" % (url, e, attempt + 1, tries))
+        time.sleep(15 * attempt)
 
 
 def exists(url):
