@@ -1,6 +1,7 @@
 package io.github.randomtools3377.fitness.ui
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,6 +64,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import io.github.randomtools3377.fitness.core.Best
 import io.github.randomtools3377.fitness.core.Exercise
 import io.github.randomtools3377.fitness.core.ExerciseKind
@@ -89,9 +91,14 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
     var viewing by remember { mutableStateOf<Workout?>(null) }
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    val context = LocalContext.current
     fun beforeStart() {
         // The rest timer tells you when rest is over, even with the app in the background.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     LazyColumn(modifier.fillMaxSize().testTag("workouts-list")) {

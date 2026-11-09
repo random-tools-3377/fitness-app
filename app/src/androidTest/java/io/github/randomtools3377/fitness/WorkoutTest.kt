@@ -1,5 +1,6 @@
 package io.github.randomtools3377.fitness
 
+import android.Manifest
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
 import io.github.randomtools3377.fitness.core.WeighIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -26,7 +28,10 @@ class WorkoutTest {
     private val app = createAndroidComposeRule<MainActivity>()
 
     @get:Rule
-    val rules: RuleChain = RuleChain.outerRule(FreshDatabase()).around(app)
+    val rules: RuleChain = RuleChain.outerRule(FreshDatabase())
+        // Starting a workout asks to show notifications (for the rest timer); granted here so the system dialog doesn't cover the app.
+        .around(GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS))
+        .around(app)
 
     @Before
     fun weighIn() {
