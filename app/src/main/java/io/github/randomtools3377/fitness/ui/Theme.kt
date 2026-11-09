@@ -2,78 +2,135 @@ package io.github.randomtools3377.fitness.ui
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import io.github.randomtools3377.fitness.R
+import io.github.randomtools3377.fitness.core.Brightness
+import io.github.randomtools3377.fitness.core.CardSize
+import io.github.randomtools3377.fitness.core.FontChoice
+import io.github.randomtools3377.fitness.core.Schemes
+import io.github.randomtools3377.fitness.core.ThemeMode
+import io.github.randomtools3377.fitness.core.ThemeSettings
 
-private val Light = lightColorScheme(
-    primary = Color(0xFFB5462F),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFDAD2),
-    onPrimaryContainer = Color(0xFF3D0600),
-    secondary = Color(0xFF3F6A2B),
-    secondaryContainer = Color(0xFFC0F0A4),
-    onSecondaryContainer = Color(0xFF062100),
+/** Whether this phone can match the app's colours to the wallpaper (Android 12 and later). */
+val canMatchWallpaper: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+/** The brightness the app is showing now (0.17.0). */
+val LocalBrightness = staticCompositionLocalOf { Brightness.LIGHT }
+
+/** How roomy cards are (0.17.0): the padding inside them and the space between their rows. */
+data class CardSpacing(val padding: Dp, val gap: Dp)
+
+val LocalCardSpacing = staticCompositionLocalOf { CardSpacing(16.dp, 8.dp) }
+
+fun spacingOf(size: CardSize) = when (size) {
+    CardSize.COMPACT -> CardSpacing(10.dp, 4.dp)
+    CardSize.COMFORTABLE -> CardSpacing(16.dp, 8.dp)
+    CardSize.LARGE -> CardSpacing(22.dp, 12.dp)
+}
+
+private fun Int.color() = Color(this)
+
+/** Every colour role built from one colour (copied from the checklist app). */
+fun schemeOf(seed: Int, brightness: Brightness): ColorScheme {
+    val s = Schemes.of(seed, brightness)
+    val base = if (brightness == Brightness.LIGHT) lightColorScheme() else darkColorScheme()
+    return base.copy(
+        primary = s.primary.color(), onPrimary = s.onPrimary.color(), primaryContainer = s.primaryContainer.color(),
+        onPrimaryContainer = s.onPrimaryContainer.color(), inversePrimary = s.inversePrimary.color(),
+        secondary = s.secondary.color(), onSecondary = s.onSecondary.color(), secondaryContainer = s.secondaryContainer.color(),
+        onSecondaryContainer = s.onSecondaryContainer.color(),
+        tertiary = s.tertiary.color(), onTertiary = s.onTertiary.color(), tertiaryContainer = s.tertiaryContainer.color(),
+        onTertiaryContainer = s.onTertiaryContainer.color(),
+        error = s.error.color(), onError = s.onError.color(), errorContainer = s.errorContainer.color(), onErrorContainer = s.onErrorContainer.color(),
+        background = s.background.color(), onBackground = s.onBackground.color(),
+        surface = s.surface.color(), onSurface = s.onSurface.color(), surfaceVariant = s.surfaceVariant.color(),
+        onSurfaceVariant = s.onSurfaceVariant.color(), surfaceTint = s.primary.color(),
+        inverseSurface = s.inverseSurface.color(), inverseOnSurface = s.inverseOnSurface.color(),
+        outline = s.outline.color(), outlineVariant = s.outlineVariant.color(), scrim = s.scrim.color(),
+        surfaceDim = s.surfaceDim.color(), surfaceBright = s.surfaceBright.color(),
+        surfaceContainerLowest = s.surfaceContainerLowest.color(), surfaceContainerLow = s.surfaceContainerLow.color(),
+        surfaceContainer = s.surfaceContainer.color(), surfaceContainerHigh = s.surfaceContainerHigh.color(),
+        surfaceContainerHighest = s.surfaceContainerHighest.color(),
+    )
+}
+
+/** The wallpaper's dark colours on pure black. */
+private fun ColorScheme.onBlack(): ColorScheme = copy(
+    background = Color.Black, surface = Color.Black, surfaceDim = Color.Black,
+    surfaceContainerLowest = Color.Black, surfaceContainerLow = Color(0xFF0B0B0B), surfaceContainer = Color(0xFF111111),
+    surfaceContainerHigh = Color(0xFF181818), surfaceContainerHighest = Color(0xFF202020),
 )
 
-private val Dark = darkColorScheme(
-    primary = Color(0xFFFFB4A3),
-    onPrimary = Color(0xFF621200),
-    primaryContainer = Color(0xFF8F2F1A),
-    onPrimaryContainer = Color(0xFFFFDAD2),
-    secondary = Color(0xFFA5D48A),
-    secondaryContainer = Color(0xFF285116),
-    onSecondaryContainer = Color(0xFFC0F0A4),
-)
+private val Rounded = FontFamily(Font(R.font.nunito_regular), Font(R.font.nunito_bold, FontWeight.Bold))
+private val Clear = FontFamily(Font(R.font.atkinson_regular), Font(R.font.atkinson_bold, FontWeight.Bold))
+private val Serif = FontFamily(Font(R.font.lora_regular), Font(R.font.lora_bold, FontWeight.Bold))
 
-/** A light and a dark scheme for each accent colour (0.10.0). */
-private fun schemes(accent: io.github.randomtools3377.fitness.core.Accent) = when (accent) {
-    io.github.randomtools3377.fitness.core.Accent.GREEN -> lightColorScheme(
-        primary = Color(0xFF2E6B30), onPrimary = Color.White, primaryContainer = Color(0xFFB1F2A9), onPrimaryContainer = Color(0xFF002204),
-        secondary = Color(0xFF52634F), secondaryContainer = Color(0xFFD5E8CF), onSecondaryContainer = Color(0xFF101F0F),
-    ) to darkColorScheme(
-        primary = Color(0xFF96D58F), onPrimary = Color(0xFF00390A), primaryContainer = Color(0xFF12521A), onPrimaryContainer = Color(0xFFB1F2A9),
-        secondary = Color(0xFFB9CCB4), secondaryContainer = Color(0xFF3B4B39), onSecondaryContainer = Color(0xFFD5E8CF),
+/** Every text style in the chosen font. */
+private fun typographyOf(font: FontChoice): Typography {
+    val base = Typography()
+    val family = when (font) {
+        FontChoice.PHONE -> return base
+        FontChoice.ROUNDED -> Rounded
+        FontChoice.CLEAR -> Clear
+        FontChoice.SERIF -> Serif
+    }
+    return Typography(
+        displayLarge = base.displayLarge.copy(fontFamily = family),
+        displayMedium = base.displayMedium.copy(fontFamily = family),
+        displaySmall = base.displaySmall.copy(fontFamily = family),
+        headlineLarge = base.headlineLarge.copy(fontFamily = family),
+        headlineMedium = base.headlineMedium.copy(fontFamily = family),
+        headlineSmall = base.headlineSmall.copy(fontFamily = family),
+        titleLarge = base.titleLarge.copy(fontFamily = family),
+        titleMedium = base.titleMedium.copy(fontFamily = family),
+        titleSmall = base.titleSmall.copy(fontFamily = family),
+        bodyLarge = base.bodyLarge.copy(fontFamily = family),
+        bodyMedium = base.bodyMedium.copy(fontFamily = family),
+        bodySmall = base.bodySmall.copy(fontFamily = family),
+        labelLarge = base.labelLarge.copy(fontFamily = family),
+        labelMedium = base.labelMedium.copy(fontFamily = family),
+        labelSmall = base.labelSmall.copy(fontFamily = family),
     )
-    io.github.randomtools3377.fitness.core.Accent.BLUE -> lightColorScheme(
-        primary = Color(0xFF2B5EA7), onPrimary = Color.White, primaryContainer = Color(0xFFD6E3FF), onPrimaryContainer = Color(0xFF001B3E),
-        secondary = Color(0xFF555F71), secondaryContainer = Color(0xFFD9E3F8), onSecondaryContainer = Color(0xFF121C2B),
-    ) to darkColorScheme(
-        primary = Color(0xFFA9C7FF), onPrimary = Color(0xFF003063), primaryContainer = Color(0xFF07468D), onPrimaryContainer = Color(0xFFD6E3FF),
-        secondary = Color(0xFFBDC7DC), secondaryContainer = Color(0xFF3E4759), onSecondaryContainer = Color(0xFFD9E3F8),
-    )
-    io.github.randomtools3377.fitness.core.Accent.PURPLE -> lightColorScheme(
-        primary = Color(0xFF6C4EA2), onPrimary = Color.White, primaryContainer = Color(0xFFEBDCFF), onPrimaryContainer = Color(0xFF260059),
-        secondary = Color(0xFF635B70), secondaryContainer = Color(0xFFE9DEF8), onSecondaryContainer = Color(0xFF1F182A),
-    ) to darkColorScheme(
-        primary = Color(0xFFD4BBFF), onPrimary = Color(0xFF3C1C70), primaryContainer = Color(0xFF543588), onPrimaryContainer = Color(0xFFEBDCFF),
-        secondary = Color(0xFFCDC2DB), secondaryContainer = Color(0xFF4B4358), onSecondaryContainer = Color(0xFFE9DEF8),
-    )
-    else -> Light to Dark
 }
 
 /**
- * Light or dark as chosen, following the phone to start; the phone's wallpaper colours on
- * Android 12 and later unless another accent is picked (0.10.0).
+ * Light, dark, pure black or following the phone; the phone's wallpaper colours on Android 12 and
+ * later unless a colour is picked, which the whole set of colours is then built from (0.17.0).
  */
 @Composable
-fun FitnessTheme(theme: io.github.randomtools3377.fitness.core.ThemeSettings = io.github.randomtools3377.fitness.core.ThemeSettings(), content: @Composable () -> Unit) {
-    val dark = when (theme.mode) {
-        io.github.randomtools3377.fitness.core.ThemeMode.LIGHT -> false
-        io.github.randomtools3377.fitness.core.ThemeMode.DARK -> true
-        io.github.randomtools3377.fitness.core.ThemeMode.SYSTEM -> isSystemInDarkTheme()
+fun FitnessTheme(theme: ThemeSettings = ThemeSettings(), content: @Composable () -> Unit) {
+    val brightness = when (theme.mode) {
+        ThemeMode.LIGHT -> Brightness.LIGHT
+        ThemeMode.DARK -> Brightness.DARK
+        ThemeMode.BLACK -> Brightness.BLACK
+        ThemeMode.SYSTEM -> if (isSystemInDarkTheme()) Brightness.DARK else Brightness.LIGHT
     }
+    val dark = brightness != Brightness.LIGHT
     val context = LocalContext.current
-    val colors = if (theme.accent == io.github.randomtools3377.fitness.core.Accent.WALLPAPER && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val seed = theme.seed
+    val colors = if (seed == null && canMatchWallpaper) {
+        when (brightness) {
+            Brightness.LIGHT -> dynamicLightColorScheme(context)
+            Brightness.DARK -> dynamicDarkColorScheme(context)
+            Brightness.BLACK -> dynamicDarkColorScheme(context).onBlack()
+        }
     } else {
-        val (light, darkScheme) = schemes(theme.accent)
-        if (dark) darkScheme else light
+        schemeOf(seed ?: io.github.randomtools3377.fitness.core.Accent.TERRACOTTA.seed, brightness)
     }
     val chart = if (theme.colourBlind) {
         // Okabe–Ito colours: told apart with any kind of colour blindness (0.14.0).
@@ -90,9 +147,11 @@ fun FitnessTheme(theme: io.github.randomtools3377.fitness.core.ThemeSettings = i
     val density = androidx.compose.ui.platform.LocalDensity.current
     androidx.compose.runtime.CompositionLocalProvider(
         LocalChartColors provides chart,
+        LocalBrightness provides brightness,
+        LocalCardSpacing provides spacingOf(theme.cardSize),
         androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, density.fontScale * theme.textScale),
     ) {
-        MaterialTheme(colorScheme = colors, content = content)
+        MaterialTheme(colorScheme = colors, typography = typographyOf(theme.font), content = content)
     }
 }
 

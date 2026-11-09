@@ -4,7 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
@@ -86,6 +88,9 @@ sealed interface Route {
 
     /** Switching parts of the app on and off (0.15.0). */
     data object Features : Route
+
+    /** Any colour for the app, from the colour picker (0.17.0). */
+    data object AppColour : Route
 }
 
 @Composable
@@ -104,6 +109,9 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
     val unlocked by vm.unlocked.collectAsState()
     val fromReminder by vm.openFromReminder.collectAsState()
     var progressPart by rememberSaveable { mutableStateOf("stats") }
+    val loaded by vm.settingsLoaded.collectAsState()
+    var opened by rememberSaveable { mutableStateOf(false) }
+    val goTo by vm.goToTab.collectAsState()
 
     // A reminder opens the screen it is about.
     LaunchedEffect(fromReminder) {
@@ -165,13 +173,30 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
             else -> true
         }
     }
-    LaunchedEffect(tabs) { if (tab !in tabs) tab = Tab.DIARY }
+    LaunchedEffect(tabs) { if (loaded && tab !in tabs) tab = Tab.DIARY }
+    // The tab chosen to open on, once the settings are read (0.17.0).
+    LaunchedEffect(loaded) {
+        if (loaded && !opened) {
+            opened = true
+            val first = settings.theme.opensOn(tabs.map { it.name })
+            tab = Tab.entries.firstOrNull { it.name == first } ?: Tab.DIARY
+        }
+    }
+    // A hidden tab opened from Settings.
+    LaunchedEffect(goTo) {
+        val name = goTo ?: return@LaunchedEffect
+        vm.goToTab.value = null
+        Tab.entries.firstOrNull { it.name == name && it in tabs }?.let { tab = it; stack.clear() }
+    }
+    val shownTabs = tabs.filter { it == Tab.DIARY || it.name !in settings.theme.hiddenTabs }
     LaunchedEffect(progressParts) { if (progressPart !in progressParts && progressParts.isNotEmpty()) progressPart = progressParts.first() }
 
     fun open(r: Route) { stack.add(r) }
     fun back() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
 
     BackHandler(enabled = stack.isNotEmpty()) { back() }
+    // Back from a hidden tab goes to the diary.
+    BackHandler(enabled = stack.isEmpty() && tab !in shownTabs) { tab = Tab.DIARY }
 
     androidx.compose.runtime.CompositionLocalProvider(LocalFeatures provides features) {
     Scaffold(
@@ -179,7 +204,7 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
         bottomBar = {
             if (stack.isEmpty()) {
                 NavigationBar {
-                    for (t in tabs) {
+                    for (t in shownTabs) {
                         NavigationBarItem(
                             selected = tab == t,
                             onClick = { tab = t },
@@ -198,7 +223,10 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
                 LockedScreen(modifier, onUnlocked = { vm.markUnlocked(tab.name) })
             } else {
                 when (tab) {
-                    Tab.DIARY -> DiaryScreen(vm, bvm, modifier, open = ::open)
+                    Tab.DIARY -> androidx.compose.foundation.layout.Box(modifier.fillMaxSize()) {
+                        DiaryBackdrop(settings.theme)
+                        DiaryScreen(vm, bvm, Modifier, open = ::open)
+                    }
                     Tab.FOODS -> FoodsScreen(vm, modifier, open = ::open)
                     Tab.WORKOUTS -> WorkoutsScreen(wvm, vm, modifier, open = ::open)
                     Tab.PROGRESS -> Column(modifier) {
@@ -269,6 +297,7 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
             Route.Bests -> BestsScreen(wvm, modifier, back = ::back)
             Route.Intervals -> IntervalScreen(wvm, modifier, back = ::back)
             Route.Features -> FeaturesScreen(vm, modifier, back = ::back)
+            Route.AppColour -> AppColourScreen(vm, settings.theme, modifier, back = ::back)
         }
     }
     }
@@ -314,5 +343,41 @@ private fun LockedScreen(modifier: Modifier, onUnlocked: () -> Unit) {
         Text("Locked", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 12.dp))
         Text("This part of the app is behind your phone's lock.", modifier = Modifier.padding(vertical = 8.dp))
         Button(onClick = unlock, modifier = Modifier.testTag("unlock")) { Text("Unlock") }
+    }
+}
+
+/** What is behind the diary (0.17.0, copied from the checklist app): nothing, a gradient, or the user's photo, faded toward the background. */
+@Composable
+private fun DiaryBackdrop(theme: io.github.randomtools3377.fitness.core.ThemeSettings) {
+    when (theme.backdrop) {
+        io.github.randomtools3377.fitness.core.Backdrop.NONE -> Unit
+        io.github.randomtools3377.fitness.core.Backdrop.GRADIENT -> androidx.compose.foundation.layout.Box(
+            Modifier
+                .fillMaxSize()
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.background)))
+                .testTag("backdrop:gradient"),
+        )
+        io.github.randomtools3377.fitness.core.Backdrop.PHOTO -> {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val image by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, theme.photoStamp) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching {
+                        android.graphics.BitmapFactory.decodeFile(io.github.randomtools3377.fitness.data.BackgroundPhoto.file(context).path)
+                            ?.asImageBitmap()
+                    }.getOrNull()
+                }
+            }
+            image?.let {
+                androidx.compose.foundation.Image(
+                    it,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                androidx.compose.foundation.layout.Box(
+                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = theme.dim / 100f)).testTag("backdrop:photo"),
+                )
+            }
+        }
     }
 }

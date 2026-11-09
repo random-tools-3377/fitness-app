@@ -76,6 +76,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val settings: StateFlow<AppSettings> = repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
+    /** True once the settings have been read, so the first tab isn't picked from the defaults (0.17.0). */
+    val settingsLoaded: StateFlow<Boolean> = repo.settings.map { true }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** A tab to go to, such as a hidden one opened from Settings (0.17.0). */
+    val goToTab = MutableStateFlow<String?>(null)
+
     /** The units in use: the user's choice, or the usual ones for the phone's region. */
     val units: StateFlow<UnitSettings> = settings
         .map { it.units ?: UnitSettings.forRegion(Locale.getDefault().country) }
@@ -419,6 +425,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setTheme(t: io.github.randomtools3377.fitness.core.ThemeSettings) = launchSafely { repo.updateSettings { it.copy(theme = t) } }
+
+    /** Changes the look from what it is now, so quick taps don't undo each other (0.17.0). */
+    fun changeTheme(change: (io.github.randomtools3377.fitness.core.ThemeSettings) -> io.github.randomtools3377.fitness.core.ThemeSettings) = launchSafely {
+        repo.updateSettings { it.copy(theme = change(it.theme)) }
+        io.github.randomtools3377.fitness.widget.TodayWidget.refresh(getApplication())
+    }
+
+    fun setAppIcon(icon: io.github.randomtools3377.fitness.core.AppIconChoice) {
+        io.github.randomtools3377.fitness.AppIcons.apply(getApplication(), icon)
+        changeTheme { it.copy(icon = icon) }
+    }
+
+    /** Copies a picked photo in as the diary's background (0.17.0). */
+    fun pickBackground(uri: Uri) {
+        viewModelScope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                io.github.randomtools3377.fitness.data.BackgroundPhoto.add(getApplication(), uri)
+            }
+            if (ok) {
+                changeTheme { it.copy(backdrop = io.github.randomtools3377.fitness.core.Backdrop.PHOTO, photoStamp = now().toString()) }
+            } else {
+                message.value = "That photo couldn't be read. Try another one."
+            }
+        }
+    }
 
     /** Periods, for marking the weight chart (0.12.0). */
     val periods: StateFlow<List<io.github.randomtools3377.fitness.core.Period>> = repo.periods.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

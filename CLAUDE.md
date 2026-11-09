@@ -387,7 +387,7 @@ not shared), where they fit a fitness app.
 - Colours: pure black as well as light, dark and follow the phone; ready-made colour themes; any
   colour from a colour picker, with the whole theme built from it so text stays readable.
 - Sizes and fonts: card size as well as text size, and a few bundled fonts.
-- Tabs and background: choosing and ordering the tabs and the one the app opens on, and a
+- Tabs and background: choosing the tabs and the one the app opens on, and a
   gradient or the user's own photo, dimmed, behind the diary.
 - Icon and widget: app icon choices, and the widget solid in the app's colours or see-through.
 - **Details (default):** the same choices as the checklist app: themes Ocean, Forest and

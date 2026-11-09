@@ -109,7 +109,33 @@ class TodayWidget : AppWidgetProvider() {
             val water = Intent(context, TodayWidget::class.java).setAction(ACTION_ADD_WATER)
             views.setOnClickPendingIntent(R.id.widget_add_water, PendingIntent.getBroadcast(context, 3, water, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             views.setTextViewText(R.id.widget_add_water, "+ Glass")
+            style(context, views, s.theme)
             manager.updateAppWidget(ids, views)
+        }
+
+        /**
+         * See-through: white text on a dark film over the wallpaper. Solid: the app's own colours
+         * when one is picked, light or dark with the phone; otherwise the usual widget colours (0.17.0).
+         */
+        private fun style(context: Context, views: RemoteViews, theme: io.github.randomtools3377.fitness.core.ThemeSettings) {
+            val texts = listOf(R.id.widget_kcal, R.id.widget_detail, R.id.widget_water)
+            if (theme.widgetStyle == io.github.randomtools3377.fitness.core.WidgetStyle.SEE_THROUGH) {
+                views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_background_clear)
+                texts.forEach { views.setTextColor(it, android.graphics.Color.WHITE) }
+                return
+            }
+            views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_background)
+            val seed = theme.seed ?: return
+            val night = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            val scheme = io.github.randomtools3377.fitness.core.Schemes.of(
+                seed,
+                if (night) io.github.randomtools3377.fitness.core.Brightness.DARK else io.github.randomtools3377.fitness.core.Brightness.LIGHT,
+            )
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                views.setColorStateList(R.id.widget_root, "setBackgroundTintList", android.content.res.ColorStateList.valueOf(scheme.surfaceContainer))
+                texts.forEach { views.setTextColor(it, scheme.onSurface) }
+            }
         }
 
         /** Called when the day's data changes, so the widget doesn't lag behind the app. */

@@ -119,7 +119,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
         }
 
         if (on(io.github.randomtools3377.fitness.core.Feature.STEPS)) StepsSection(vm, settings)
-        ThemeSection(vm, settings)
+        ThemeSection(vm, settings, open)
         RemindersSection(vm, settings)
         PrivacySection(vm, settings)
 
@@ -189,7 +189,8 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
                 "Reading labels uses Tesseract OCR and its English data (tessdata_fast), through Tesseract4Android, " +
                     "all under the Apache License 2.0. Barcode scanning uses ZXing, under the Apache License 2.0. " +
                     "Better label reading, if you add it, uses PaddleOCR's PP-OCRv6 models (Baidu and the PaddleOCR authors, " +
-                    "as converted by RapidOCR, Apache License 2.0), run with ONNX Runtime (MIT License).",
+                    "as converted by RapidOCR, Apache License 2.0), run with ONNX Runtime (MIT License). " +
+                    "The fonts Nunito, Atkinson Hyperlegible and Lora are under the SIL Open Font License 1.1.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
