@@ -20,7 +20,10 @@ import io.github.randomtools3377.fitness.core.CardioType
 import io.github.randomtools3377.fitness.core.Exercise
 import io.github.randomtools3377.fitness.core.ExerciseKind
 import io.github.randomtools3377.fitness.core.Exercises
+import io.github.randomtools3377.fitness.core.Recipe
+import io.github.randomtools3377.fitness.core.RecipeText
 import io.github.randomtools3377.fitness.core.SavedWorkout
+import io.github.randomtools3377.fitness.core.ShoppingItem
 import io.github.randomtools3377.fitness.core.SavedWorkoutItem
 import io.github.randomtools3377.fitness.core.Workout
 import io.github.randomtools3377.fitness.core.WorkoutExercise
@@ -73,6 +76,31 @@ data class EntryRow(
     val carbs: Double,
     val fat: Double,
     val createdAt: Long,
+    /** Version 4 (0.5.0): planned ahead, not eaten yet. */
+    @androidx.room.ColumnInfo(defaultValue = "0") val planned: Boolean = false,
+)
+
+@Entity(tableName = "recipes")
+data class RecipeRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val servings: Double,
+    /** The recipe's foods, as JSON. */
+    val items: String,
+    val cookedGrams: Double?,
+    val notes: String,
+    val createdAt: Long,
+    val hidden: Boolean = false,
+)
+
+@Entity(tableName = "shopping_items")
+data class ShoppingRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val grams: Double?,
+    val unit: String,
+    val ticked: Boolean,
+    val own: Boolean,
 )
 
 @Entity(tableName = "saved_meals")
@@ -339,6 +367,49 @@ interface FitnessDao {
     @Insert
     suspend fun insertFoods(rows: List<FoodRow>)
 
+    // Planning, recipes and the shopping list (0.5.0).
+    @Query("SELECT * FROM entries WHERE day BETWEEN :from AND :to ORDER BY day, createdAt, id")
+    fun entriesBetween(from: Long, to: Long): Flow<List<EntryRow>>
+
+    @Query("SELECT * FROM entries WHERE planned = 1 AND day BETWEEN :from AND :to ORDER BY day, createdAt, id")
+    suspend fun plannedBetween(from: Long, to: Long): List<EntryRow>
+
+    @Query("SELECT * FROM recipes WHERE hidden = 0 ORDER BY name COLLATE NOCASE")
+    fun recipes(): Flow<List<RecipeRow>>
+
+    @Query("SELECT * FROM recipes ORDER BY id")
+    suspend fun allRecipes(): List<RecipeRow>
+
+    @Query("SELECT * FROM recipes WHERE id = :id")
+    suspend fun recipe(id: Long): RecipeRow?
+
+    @Upsert
+    suspend fun putRecipe(row: RecipeRow): Long
+
+    @Query("UPDATE recipes SET hidden = 1 WHERE id = :id")
+    suspend fun hideRecipe(id: Long)
+
+    @Query("SELECT * FROM shopping_items ORDER BY own, name COLLATE NOCASE")
+    fun shopping(): Flow<List<ShoppingRow>>
+
+    @Query("SELECT * FROM shopping_items ORDER BY id")
+    suspend fun allShopping(): List<ShoppingRow>
+
+    @Insert
+    suspend fun insertShopping(rows: List<ShoppingRow>)
+
+    @Query("UPDATE shopping_items SET ticked = :ticked WHERE id = :id")
+    suspend fun tickShopping(id: Long, ticked: Boolean)
+
+    @Query("DELETE FROM shopping_items WHERE id = :id")
+    suspend fun deleteShopping(id: Long)
+
+    @Query("DELETE FROM shopping_items WHERE own = 0 OR ticked = 1")
+    suspend fun clearMadeAndTicked()
+
+    @Query("DELETE FROM recipes") suspend fun clearRecipes()
+    @Query("DELETE FROM shopping_items") suspend fun clearShopping()
+
     // Exercises of the user's own, and rest times.
     @Query("SELECT * FROM exercises ORDER BY name COLLATE NOCASE")
     fun exercises(): Flow<List<ExerciseRow>>
@@ -436,10 +507,12 @@ interface FitnessDao {
         ExerciseRow::class, RestRow::class, WorkoutRow::class, WorkoutSetRow::class, SavedWorkoutRow::class, SavedWorkoutItemRow::class,
         // Version 3 (0.3.0): barcodes and country files.
         ProductRow::class, CountryRow::class,
+        // Version 4 (0.5.0): planning ahead, recipes and the shopping list.
+        RecipeRow::class, ShoppingRow::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
@@ -472,13 +545,14 @@ fun Food.toRow(createdAt: Long) = FoodRow(
 fun EntryRow.toCore() = DiaryEntry(
     id = id, day = dayOf(day), meal = Meal.valueOf(meal), foodId = foodId, builtInId = builtInId, name = name,
     amount = Amount(quantity, portion), unit = BaseUnit.valueOf(unit), nutrients = Nutrients(kcal, protein, carbs, fat),
-    createdAt = createdAt,
+    createdAt = createdAt, planned = planned,
 )
 
 fun DiaryEntry.toRow() = EntryRow(
     id = id, day = day.toDay(), meal = meal.name, foodId = foodId, builtInId = builtInId, name = name,
     quantity = amount.quantity, portion = amount.portion, unit = unit.name,
     kcal = nutrients.kcal, protein = nutrients.protein, carbs = nutrients.carbs, fat = nutrients.fat, createdAt = createdAt,
+    planned = planned,
 )
 
 fun SavedMealItemRow.toCore() = SavedMealItem(
@@ -553,3 +627,8 @@ fun SavedWorkout.itemRows(savedId: Long) = items.mapIndexed { i, it ->
         met = it.exercise.met, muscle = it.exercise.muscle, cardio = it.exercise.cardio.name, sets = it.sets,
     )
 }
+
+fun RecipeRow.toCore() = Recipe(id, name, servings, RecipeText.decode(items), cookedGrams, notes, createdAt)
+fun Recipe.toRow() = RecipeRow(id, name, servings, RecipeText.encode(items), cookedGrams, notes, createdAt)
+fun ShoppingRow.toCore() = ShoppingItem(id, name, grams, BaseUnit.valueOf(unit), ticked, own)
+fun ShoppingItem.toRow() = ShoppingRow(id, name, grams, unit.name, ticked, own)

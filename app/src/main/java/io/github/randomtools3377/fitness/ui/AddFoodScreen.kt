@@ -52,8 +52,12 @@ fun sourceOf(food: Food): String = when (food.builtInId?.firstOrNull()) {
     null -> "Your food"
     'C' -> "European (CIQUAL)"
     'P' -> "Packaged (Open Food Facts)"
+    'R' -> "Your recipe"
     else -> "USDA"
 }
+
+/** What adding a food is for: the diary, the plan for a day ahead, or a recipe. */
+enum class AddMode { LOG, PLAN, RECIPE }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +68,14 @@ fun AddFoodScreen(
     modifier: Modifier,
     back: () -> Unit,
     newFood: (barcode: String?) -> Unit,
+    mode: AddMode = AddMode.LOG,
+    planDay: kotlinx.datetime.LocalDate? = null,
 ) {
+    fun add(f: Food, a: Amount) = when (mode) {
+        AddMode.LOG -> { vm.log(f, a, meal); Unit }
+        AddMode.PLAN -> { vm.plan(f, a, planDay ?: vm.today(), meal); Unit }
+        AddMode.RECIPE -> vm.addToRecipe(f, a)
+    }
     val query by vm.query.collectAsState()
     val results by vm.results.collectAsState()
     val recent by vm.recent.collectAsState()
@@ -95,7 +106,15 @@ fun AddFoodScreen(
 
     Column(modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text("Add to ${meal.title.lowercase()}") },
+            title = {
+                Text(
+                    when (mode) {
+                        AddMode.LOG -> "Add to ${meal.title.lowercase()}"
+                        AddMode.PLAN -> "Plan ${meal.title.lowercase()}, ${dayName(planDay ?: vm.today(), vm.today())}"
+                        AddMode.RECIPE -> "Add to the recipe"
+                    },
+                )
+            },
             navigationIcon = {
                 IconButton(onClick = back, modifier = Modifier.testTag("back")) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -112,14 +131,17 @@ fun AddFoodScreen(
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = scan, modifier = Modifier.testTag("scan")) { Text("Scan") }
             OutlinedButton(onClick = { newFood(null) }, modifier = Modifier.testTag("new-food")) { Text("From a label") }
-            OutlinedButton(onClick = { quick = true }, modifier = Modifier.testTag("quick-add")) { Text("Quick add") }
+            if (mode != AddMode.RECIPE) OutlinedButton(onClick = { quick = true }, modifier = Modifier.testTag("quick-add")) { Text("Quick add") }
         }
         LazyColumn(Modifier.fillMaxSize().testTag("food-list")) {
             if (query.isBlank()) {
-                if (saved.isNotEmpty()) {
+                if (saved.isNotEmpty() && mode != AddMode.RECIPE) {
                     item { Heading("Saved meals") }
                     items(saved, key = { "meal:${it.id}" }) { m ->
-                        SavedMealRow(m, units) { vm.logSavedMeal(m, meal); back() }
+                        SavedMealRow(m, units) {
+                            if (mode == AddMode.PLAN) vm.planSavedMeal(m, planDay ?: vm.today(), meal) else vm.logSavedMeal(m, meal)
+                            back()
+                        }
                     }
                 }
                 if (recent.isNotEmpty()) {
@@ -167,8 +189,8 @@ fun AddFoodScreen(
             food = f,
             units = units,
             initial = null,
-            confirmText = "Add",
-            onConfirm = { a -> vm.log(f, a, meal); picked = null; back() },
+            confirmText = if (mode == AddMode.PLAN) "Plan" else "Add",
+            onConfirm = { a -> add(f, a); picked = null; back() },
             onDismiss = { picked = null },
         )
     }
@@ -181,7 +203,11 @@ fun AddFoodScreen(
             units = units,
             initialKcal = null,
             initialName = "",
-            onConfirm = { kcal, name -> vm.quickAdd(kcal, name, meal); quick = false; back() },
+            onConfirm = { kcal, name ->
+                if (mode == AddMode.PLAN) vm.planQuickAdd(kcal, name, planDay ?: vm.today(), meal) else vm.quickAdd(kcal, name, meal)
+                quick = false
+                back()
+            },
             onDismiss = { quick = false },
         )
     }

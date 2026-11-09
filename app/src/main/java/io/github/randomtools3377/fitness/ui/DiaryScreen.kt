@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -95,6 +96,9 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
                 IconButton(onClick = { vm.day.value = day.plus(DatePeriod(days = 1)) }, modifier = Modifier.testTag("day-next")) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Day after")
                 }
+                IconButton(onClick = { open(Route.Settings) }, modifier = Modifier.testTag("open-settings")) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                }
                 Box {
                     IconButton(onClick = { dayMenu = true }, modifier = Modifier.testTag("day-menu")) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "More")
@@ -163,6 +167,7 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
                     copy = { open(Route.Copy(meal)) },
                     save = { savingMeal = meal },
                     edit = { editing = it },
+                    eat = { vm.eatPlanned(it) },
                 )
             }
         }
@@ -239,6 +244,7 @@ private fun MealCard(
     copy: () -> Unit,
     save: () -> Unit,
     edit: (DiaryEntry) -> Unit,
+    eat: (DiaryEntry) -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Section {
@@ -264,7 +270,7 @@ private fun MealCard(
                         onClick = { menu = false; copy() },
                         modifier = Modifier.testTag("copy-meal-from:${meal.name}"),
                     )
-                    if (entries.isNotEmpty()) {
+                    if (entries.any { !it.planned }) {
                         DropdownMenuItem(
                             text = { Text("Save as a meal") },
                             onClick = { menu = false; save() },
@@ -274,7 +280,17 @@ private fun MealCard(
                 }
             }
         }
-        for (e in entries) {
+        for (e in entries.filter { it.planned }) {
+            // Planned ahead: doesn't count until ticked as eaten.
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("planned:${e.name}"), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(e.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Planned · ${e.describeAmount()} · ${energy(e.nutrients.kcal, units)}", style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = { eat(e) }, modifier = Modifier.testTag("eat:${e.name}")) { Text("Eaten") }
+            }
+        }
+        for (e in entries.filter { !it.planned }) {
             Row(
                 Modifier.fillMaxWidth().clickable { edit(e) }.padding(vertical = 6.dp).testTag("entry:${e.name}"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -289,7 +305,7 @@ private fun MealCard(
                 Text(energy(e.nutrients.kcal, units), fontWeight = FontWeight.Medium)
             }
         }
-        if (entries.isNotEmpty()) {
+        if (entries.any { !it.planned }) {
             Text(macroLine(total), style = MaterialTheme.typography.bodySmall)
         }
     }
