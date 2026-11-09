@@ -363,6 +363,17 @@ fun ThemeSection(vm: MainViewModel, settings: AppSettings) {
             it != io.github.randomtools3377.fitness.core.Accent.WALLPAPER || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         }
         Choices(accents, t.accent, { it.title }, { "accent:${it.name}" }) { vm.setTheme(t.copy(accent = it)) }
+        Text("Text size", style = MaterialTheme.typography.labelLarge)
+        Choices(listOf(1f, 1.15f, 1.3f), t.textScale, { when (it) { 1f -> "As the phone"; 1.15f -> "Larger"; else -> "Largest" } }, { "text-size:$it" }) {
+            vm.setTheme(t.copy(textScale = it))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Colour-blind-friendly charts")
+                Text("Blue and orange instead of colours that can be hard to tell apart.", style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = t.colourBlind, onCheckedChange = { vm.setTheme(t.copy(colourBlind = it)) }, modifier = Modifier.testTag("colour-blind"))
+        }
     }
 }
 
