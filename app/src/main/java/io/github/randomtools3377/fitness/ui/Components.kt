@@ -41,7 +41,7 @@ fun NumberField(
         value = value,
         onValueChange = { text -> onChange(text.filter { it.isDigit() || (decimals && (it == '.' || it == ',')) }) },
         label = { Text(label) },
-        suffix = suffix?.let { { Text(it) } },
+        suffix = if (suffix != null) { { Text(suffix) } } else null,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = if (decimals) KeyboardType.Decimal else KeyboardType.Number),
         modifier = modifier.testTag(tag),
