@@ -39,6 +39,17 @@ enum class Micro(val key: String, val title: String, val unit: String, val refer
 }
 
 object Micros {
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+    private val serializer = kotlinx.serialization.builtins.MapSerializer(
+        kotlinx.serialization.builtins.serializer<String>(), kotlinx.serialization.builtins.serializer<Double>(),
+    )
+
+    /** For the database: the map as JSON, or null when empty. */
+    fun encode(m: Map<String, Double>): String? = if (m.isEmpty()) null else json.encodeToString(serializer, m)
+
+    fun decode(text: String?): Map<String, Double> =
+        if (text.isNullOrBlank()) emptyMap() else runCatching { json.decodeFromString(serializer, text) }.getOrDefault(emptyMap())
+
     /** Adds two maps; a key only one has is kept as it is. */
     fun add(a: Map<String, Double>, b: Map<String, Double>): Map<String, Double> {
         if (a.isEmpty()) return b
@@ -115,5 +126,20 @@ object DayTarget {
         days.weekdayKcal.containsKey(day.dayOfWeek.ordinal + 1) -> "This weekday's own target"
         trainingDay && (days.trainingExtraKcal ?: 0) != 0 -> "A training day: ${days.trainingExtraKcal} kcal more"
         else -> null
+    }
+
+    /** A training day: one with a finished workout, or a day the weekly programme has a workout. */
+    fun isTrainingDay(s: AppSettings, workoutDays: Set<LocalDate>, day: LocalDate): Boolean =
+        day in workoutDays || s.programme.containsKey(day.dayOfWeek.ordinal + 1)
+
+    /** Each day's target from the settings, the latest weight and the days with a workout. */
+    fun resolver(s: AppSettings, weightKg: Double?, workoutDays: Set<LocalDate>, year: Int): (LocalDate) -> Int? {
+        val maintenance = s.profile?.let { Targets.calculate(it, year, weightKg ?: it.weightKg).maintenanceKcal }
+        return { d -> forDay(s.targetKcal, d, s.dayTargets, s.dietBreak, maintenance, isTrainingDay(s, workoutDays, d)) }
+    }
+
+    fun whyFor(s: AppSettings, weightKg: Double?, workoutDays: Set<LocalDate>, year: Int, day: LocalDate): String? {
+        val maintenance = s.profile?.let { Targets.calculate(it, year, weightKg ?: it.weightKg).maintenanceKcal }
+        return why(s.targetKcal, day, s.dayTargets, s.dietBreak, maintenance, isTrainingDay(s, workoutDays, day))
     }
 }

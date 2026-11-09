@@ -94,6 +94,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
 
         MacroSection(settings.macros, settings.targetKcal ?: 2000, onSave = vm::setMacros)
         MealSplitSection(vm, settings)
+        DayTargetsSection(vm, settings)
         ExtraTargetsSection(vm, settings)
         WaterSection(settings.water, units.volume, onSave = vm::setWater)
 

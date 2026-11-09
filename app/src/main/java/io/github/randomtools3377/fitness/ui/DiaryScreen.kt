@@ -1,5 +1,6 @@
 package io.github.randomtools3377.fitness.ui
 
+import kotlin.math.roundToInt
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,6 +79,10 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
     val steps by vm.daySteps.collectAsState()
     val stepsKcal by vm.dayStepsKcal.collectAsState()
     val burned = workoutBurned + stepsKcal
+    val targetFor by vm.targetFor.collectAsState()
+    val why by vm.dayTargetWhy.collectAsState()
+    // The day's own target (0.11.0): by weekday, on a training day, or in a diet break.
+    val target = targetFor(day)
     val dayWorkouts by vm.dayWorkouts.collectAsState()
     var editing by remember { mutableStateOf<DiaryEntry?>(null) }
     var savingMeal by remember { mutableStateOf<Meal?>(null) }
@@ -120,7 +125,16 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
             }
         }
 
-        item { SummaryCard(totals.total, burned, settings.burnedHalf, settings.targetKcal, settings.macros.grams(settings.targetKcal ?: 0), settings.extraTargets, units, open, steps, stepsKcal) }
+        item {
+            SummaryCard(
+                totals.total, burned, settings.burnedHalf, target, settings.macros.grams(target ?: 0), settings.extraTargets, units, open, steps, stepsKcal,
+                why = why, drinkGrams = settings.drinkGrams ?: io.github.randomtools3377.fitness.core.standardDrinkGrams(java.util.Locale.getDefault().country),
+            )
+        }
+        // Vitamins and minerals from built-in foods (0.11.0).
+        if (totals.total.micros.keys.any { k -> io.github.randomtools3377.fitness.core.Micro.VITAMINS_AND_MINERALS.any { it.key == k } }) {
+            item(key = "micros") { MicrosCard(totals.total) }
+        }
 
         if (dayWorkouts.isNotEmpty()) {
             item {
@@ -161,8 +175,8 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
 
         for (meal in Meal.entries) {
             item(key = meal.name) {
-                val mealTargets = if (settings.mealSplit.enabled && settings.targetKcal != null)
-                    settings.mealSplit.targets(settings.macros.grams(settings.targetKcal!!)) else null
+                val mealTargets = if (settings.mealSplit.enabled && target != null)
+                    settings.mealSplit.targets(settings.macros.grams(target)) else null
                 MealCard(
                     meal = meal,
                     target = mealTargets?.get(meal),
@@ -221,6 +235,8 @@ private fun SummaryCard(
     open: (Route) -> Unit,
     steps: Long? = null,
     stepsKcal: Double = 0.0,
+    why: String? = null,
+    drinkGrams: Double = 10.0,
 ) {
     Section("Calories") {
         LabelValue("Eaten", energy(eaten.kcal, units), tag = "day-kcal")
@@ -240,6 +256,7 @@ private fun SummaryCard(
         } else {
             val left = targetKcal + burned - eaten.kcal
             LabelValue("Target", energy(targetKcal.toDouble(), units), tag = "day-target")
+            why?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.testTag("day-target-why")) }
             LabelValue(
                 if (left >= 0) "Left" else "Over",
                 energy(kotlin.math.abs(left), units),
@@ -256,6 +273,49 @@ private fun SummaryCard(
         ExtraRow("Sugar", eaten.sugar, extraTargets.sugar, atLeast = false)
         ExtraRow("Saturates", eaten.satFat, extraTargets.satFat, atLeast = false)
         ExtraRow("Salt", eaten.salt, extraTargets.salt, atLeast = false)
+        // Alcohol and caffeine (0.11.0).
+        val alcohol = eaten.micro(io.github.randomtools3377.fitness.core.Micro.ALCOHOL)
+        if (alcohol != null && alcohol > 0 || extraTargets.alcoholDrinks != null) {
+            val drinks = io.github.randomtools3377.fitness.core.Micros.drinks(alcohol ?: 0.0, drinkGrams)
+            val limit = extraTargets.alcoholDrinks
+            LabelValue(
+                "Alcohol",
+                "${io.github.randomtools3377.fitness.core.formatAmount(drinks)} standard drinks" + (limit?.let { " of at most ${io.github.randomtools3377.fitness.core.formatAmount(it)}" } ?: ""),
+                tag = "day-alcohol",
+            )
+            if (limit != null && drinks > limit) Text("Over the day's limit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        val caffeine = eaten.micro(io.github.randomtools3377.fitness.core.Micro.CAFFEINE)
+        if (caffeine != null && caffeine > 0 || extraTargets.caffeineMg != null) {
+            val mg = (caffeine ?: 0.0).roundToInt()
+            val limit = extraTargets.caffeineMg
+            LabelValue("Caffeine", "$mg mg" + (limit?.let { " of at most ${it.roundToInt()} mg" } ?: ""), tag = "day-caffeine")
+            if (limit != null && mg > limit) Text("Over the day's limit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+/** The day's vitamins and minerals from built-in foods, as a share of the EU label reference values (0.11.0). */
+@Composable
+private fun MicrosCard(total: Nutrients) {
+    var open by remember { mutableStateOf(false) }
+    Section("Vitamins and minerals") {
+        Text(
+            "From built-in foods only, as a share of the reference values on EU labels. These are a guide, not your own needs.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        val shown = io.github.randomtools3377.fitness.core.Micro.VITAMINS_AND_MINERALS.filter { total.micro(it) != null }
+        for (m in if (open) shown else shown.take(4)) {
+            val x = total.micro(m)!!
+            val pct = io.github.randomtools3377.fitness.core.Micros.percent(m, x) ?: 0
+            Column {
+                LabelValue(m.title, "${io.github.randomtools3377.fitness.core.formatAmount(Math.round(x * 10) / 10.0)} ${m.unit} · $pct%", tag = "micro:${m.key}")
+                LinearProgressIndicator(progress = { (pct / 100f).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
+            }
+        }
+        if (shown.size > 4) {
+            TextButton(onClick = { open = !open }, modifier = Modifier.testTag("micros-more")) { Text(if (open) "Show fewer" else "Show all ${shown.size}") }
+        }
     }
 }
 

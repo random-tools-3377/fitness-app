@@ -63,6 +63,8 @@ data class FoodRow(
     val sugar: Double? = null,
     val satFat: Double? = null,
     val salt: Double? = null,
+    /** Version 9 (0.11.0): alcohol, caffeine, and vitamins and minerals, as JSON; null when none. */
+    val micros: String? = null,
 )
 
 @Entity(tableName = "entries", indices = [Index("day")])
@@ -89,6 +91,8 @@ data class EntryRow(
     val sugar: Double? = null,
     val satFat: Double? = null,
     val salt: Double? = null,
+    /** Version 9 (0.11.0): alcohol, caffeine, and vitamins and minerals, as JSON; null when none. */
+    val micros: String? = null,
 )
 
 @Entity(tableName = "recipes")
@@ -154,6 +158,8 @@ data class SavedMealItemRow(
     val sugar: Double? = null,
     val satFat: Double? = null,
     val salt: Double? = null,
+    /** Version 9 (0.11.0): alcohol, caffeine, and vitamins and minerals, as JSON; null when none. */
+    val micros: String? = null,
 )
 
 @Entity(tableName = "water", indices = [Index("day")])
@@ -559,9 +565,9 @@ interface FitnessDao {
         // Version 7 (0.8.0): measurements, sleep and mood, habits, progress photos.
         MeasurementRow::class, DayNoteRow::class, HabitRow::class, HabitTickRow::class, PhotoRow::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
@@ -583,19 +589,20 @@ fun dayOf(n: Long): LocalDate = LocalDate.fromEpochDays(n.toInt())
 
 fun FoodRow.toCore() = Food(
     id = id, name = name, brand = brand, unit = BaseUnit.valueOf(unit),
-    per100 = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt), portions = PortionText.decode(portions), hidden = hidden, barcode = barcode,
+    per100 = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt, io.github.randomtools3377.fitness.core.Micros.decode(micros)), portions = PortionText.decode(portions), hidden = hidden, barcode = barcode,
 )
 
 fun Food.toRow(createdAt: Long) = FoodRow(
     id = id, name = name, brand = brand, unit = unit.name,
     kcal = per100.kcal, protein = per100.protein, carbs = per100.carbs, fat = per100.fat,
     fibre = per100.fibre, sugar = per100.sugar, satFat = per100.satFat, salt = per100.salt,
+    micros = io.github.randomtools3377.fitness.core.Micros.encode(per100.micros),
     portions = PortionText.encode(portions), createdAt = createdAt, hidden = hidden, barcode = barcode,
 )
 
 fun EntryRow.toCore() = DiaryEntry(
     id = id, day = dayOf(day), meal = Meal.valueOf(meal), foodId = foodId, builtInId = builtInId, name = name,
-    amount = Amount(quantity, portion), unit = BaseUnit.valueOf(unit), nutrients = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt),
+    amount = Amount(quantity, portion), unit = BaseUnit.valueOf(unit), nutrients = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt, io.github.randomtools3377.fitness.core.Micros.decode(micros)),
     createdAt = createdAt, planned = planned,
 )
 
@@ -603,13 +610,14 @@ fun DiaryEntry.toRow() = EntryRow(
     id = id, day = day.toDay(), meal = meal.name, foodId = foodId, builtInId = builtInId, name = name,
     quantity = amount.quantity, portion = amount.portion, unit = unit.name,
     kcal = nutrients.kcal, protein = nutrients.protein, carbs = nutrients.carbs, fat = nutrients.fat,
-    fibre = nutrients.fibre, sugar = nutrients.sugar, satFat = nutrients.satFat, salt = nutrients.salt, createdAt = createdAt,
+    fibre = nutrients.fibre, sugar = nutrients.sugar, satFat = nutrients.satFat, salt = nutrients.salt,
+    micros = io.github.randomtools3377.fitness.core.Micros.encode(nutrients.micros), createdAt = createdAt,
     planned = planned,
 )
 
 fun SavedMealItemRow.toCore() = SavedMealItem(
     foodId = foodId, builtInId = builtInId, name = name, amount = Amount(quantity, portion), unit = BaseUnit.valueOf(unit),
-    nutrients = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt),
+    nutrients = Nutrients(kcal, protein, carbs, fat, fibre, sugar, satFat, salt, io.github.randomtools3377.fitness.core.Micros.decode(micros)),
 )
 
 fun SavedMealItem.toRow(mealId: Long, position: Int) = SavedMealItemRow(
@@ -617,6 +625,7 @@ fun SavedMealItem.toRow(mealId: Long, position: Int) = SavedMealItemRow(
     quantity = amount.quantity, portion = amount.portion, unit = unit.name,
     kcal = nutrients.kcal, protein = nutrients.protein, carbs = nutrients.carbs, fat = nutrients.fat,
     fibre = nutrients.fibre, sugar = nutrients.sugar, satFat = nutrients.satFat, salt = nutrients.salt,
+    micros = io.github.randomtools3377.fitness.core.Micros.encode(nutrients.micros),
 )
 
 fun savedMealsOf(meals: List<SavedMealRow>, items: List<SavedMealItemRow>): List<SavedMeal> {

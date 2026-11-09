@@ -85,6 +85,7 @@ private fun PlanMeals(vm: MainViewModel, open: (Route) -> Unit) {
     val from by vm.planDay.collectAsState()
     val week by vm.planWeek.collectAsState()
     val settings by vm.settings.collectAsState()
+    val targetFor by vm.targetFor.collectAsState()
     val units by vm.units.collectAsState()
     val today = vm.today()
     LazyColumn(Modifier.fillMaxSize().testTag("plan-list")) {
@@ -114,7 +115,7 @@ private fun PlanMeals(vm: MainViewModel, open: (Route) -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(dayName(day, today), style = MaterialTheme.typography.titleMedium)
-                            val target = settings.targetKcal
+                            val target = targetFor(day)
                             Text(
                                 "Planned ${energy(planned.kcal, units)}" +
                                     (if (eaten.kcal > 0) " · eaten ${energy(eaten.kcal, units)}" else "") +

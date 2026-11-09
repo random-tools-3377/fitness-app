@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -276,7 +277,11 @@ fun ExtraTargetsSection(vm: MainViewModel, settings: AppSettings) {
     var sugar by remember(t) { mutableStateOf(text(t.sugar)) }
     var satFat by remember(t) { mutableStateOf(text(t.satFat)) }
     var salt by remember(t) { mutableStateOf(text(t.salt)) }
-    Section("Fibre, sugar, saturates and salt") {
+    var drinks by remember(t) { mutableStateOf(text(t.alcoholDrinks)) }
+    var caffeine by remember(t) { mutableStateOf(text(t.caffeineMg)) }
+    val regionDrink = io.github.randomtools3377.fitness.core.standardDrinkGrams(java.util.Locale.getDefault().country)
+    var drinkGrams by remember(settings.drinkGrams) { mutableStateOf(text(settings.drinkGrams ?: regionDrink)) }
+    Section("Fibre, sugar, saturates, salt, alcohol and caffeine") {
         Text(
             "Shown on the day when a food gives them. Daily targets are optional: leave a box empty for none.",
             style = MaterialTheme.typography.bodySmall,
@@ -289,10 +294,17 @@ fun ExtraTargetsSection(vm: MainViewModel, settings: AppSettings) {
             NumberField(satFat, { satFat = it }, "Saturates, at most", "target:satfat", Modifier.weight(1f), suffix = "g")
             NumberField(salt, { salt = it }, "Salt, at most", "target:salt", Modifier.weight(1f), suffix = "g")
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(drinks, { drinks = it }, "Drinks, at most", "target:drinks", Modifier.weight(1f))
+            NumberField(caffeine, { caffeine = it }, "Caffeine, at most", "target:caffeine", Modifier.weight(1f), suffix = "mg")
+        }
+        NumberField(drinkGrams, { drinkGrams = it }, "A standard drink", "field:drink-grams", Modifier.fillMaxWidth(), suffix = "g of alcohol")
         OutlinedButton(
             onClick = {
                 fun parse(s: String) = io.github.randomtools3377.fitness.core.Units.parse(s)
-                vm.setExtraTargets(io.github.randomtools3377.fitness.core.ExtraTargets(parse(fibre), parse(sugar), parse(satFat), parse(salt)))
+                vm.setExtraTargets(io.github.randomtools3377.fitness.core.ExtraTargets(parse(fibre), parse(sugar), parse(satFat), parse(salt), parse(drinks), parse(caffeine)))
+                val g = parse(drinkGrams)
+                vm.setDrinkGrams(if (g == null || g == regionDrink) null else g)
             },
             modifier = Modifier.testTag("save-extra-targets"),
         ) { Text("Save") }
@@ -377,6 +389,48 @@ fun StepsSection(vm: MainViewModel, settings: AppSettings) {
                 },
                 modifier = Modifier.testTag("steps-on"),
             )
+        }
+    }
+}
+
+/** A target for each weekday, extra on training days, and diet breaks (0.11.0). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DayTargetsSection(vm: MainViewModel, settings: AppSettings) {
+    val t = settings.dayTargets
+    val typed = remember(t) { androidx.compose.runtime.mutableStateMapOf<Int, String>().apply { t.weekdayKcal.forEach { (d, k) -> put(d, k.toString()) } } }
+    var extra by remember(t) { mutableStateOf(t.trainingExtraKcal?.toString().orEmpty()) }
+    Section("Targets by day") {
+        Text(
+            "Optional. A weekday's own calorie target replaces the usual one on that day; leave it empty for the usual. " +
+                "Training days, with a finished workout or one in your weekly programme, can get extra calories.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (d in 1..7) {
+                NumberField(typed[d].orEmpty(), { typed[d] = it }, DAY_NAMES[d - 1], "day-target:$d", Modifier.width(110.dp), suffix = "kcal", decimals = false)
+            }
+        }
+        NumberField(extra, { extra = it }, "Extra on training days", "field:training-extra", Modifier.fillMaxWidth(), suffix = "kcal", decimals = false)
+        OutlinedButton(onClick = {
+            val map = typed.mapNotNull { (d, v) -> v.trim().toIntOrNull()?.let { d to it } }.toMap()
+            vm.setDayTargets(io.github.randomtools3377.fitness.core.DayTargets(map, extra.trim().toIntOrNull()?.takeIf { it != 0 }))
+        }, modifier = Modifier.testTag("save-day-targets")) { Text("Save") }
+
+        Text("Diet break", style = MaterialTheme.typography.labelLarge)
+        val b = settings.dietBreak
+        if (b != null && b.end >= vm.today()) {
+            Text("At maintenance calories from ${b.start} to ${b.end}, then back to your plan.", modifier = Modifier.testTag("diet-break"))
+            TextButton(onClick = { vm.endDietBreak() }, modifier = Modifier.testTag("end-diet-break")) { Text("End it now") }
+        } else {
+            Text(
+                "A week or two at the calories that keep your weight the same, as a rest from losing or gaining. It ends by itself.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { vm.startDietBreak(1) }, modifier = Modifier.testTag("diet-break:1")) { Text("1 week") }
+                OutlinedButton(onClick = { vm.startDietBreak(2) }, modifier = Modifier.testTag("diet-break:2")) { Text("2 weeks") }
+            }
         }
     }
 }
