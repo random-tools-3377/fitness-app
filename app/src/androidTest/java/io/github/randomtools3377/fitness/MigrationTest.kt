@@ -31,7 +31,7 @@ class MigrationTest {
             close()
         }
 
-        helper.runMigrationsAndValidate(name, 2, true).close()
+        helper.runMigrationsAndValidate(name, 3, true).close()
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
@@ -39,6 +39,7 @@ class MigrationTest {
             runBlocking {
                 val dao = db.dao()
                 assertEquals("Oats", dao.food(1)!!.toCore().name)
+                assertEquals(null, dao.food(1)!!.toCore().barcode)
                 assertEquals(190.0, dao.entry(1)!!.toCore().nutrients.kcal, 1e-9)
                 assertEquals(72.5, dao.allWeighIns().single().kg, 1e-9)
                 assertTrue(dao.allWorkouts().isEmpty())

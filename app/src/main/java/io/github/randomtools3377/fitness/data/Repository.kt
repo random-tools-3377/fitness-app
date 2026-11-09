@@ -12,6 +12,7 @@ import io.github.randomtools3377.fitness.core.Exercises
 import io.github.randomtools3377.fitness.core.SavedWorkout
 import io.github.randomtools3377.fitness.core.Workout
 import io.github.randomtools3377.fitness.core.Food
+import io.github.randomtools3377.fitness.core.Product
 import io.github.randomtools3377.fitness.core.SavedMeal
 import io.github.randomtools3377.fitness.core.Usage
 import io.github.randomtools3377.fitness.core.WaterEntry
@@ -69,11 +70,32 @@ class Repository(private val context: Context, val db: AppDatabase) {
         db.withTransaction { for (f in foods) dao.insertFood(f.copy(id = 0).toRow(now)) }
     }
 
+    // Barcodes and country files (0.3.0).
+    private val products = db.productDao()
+    val countries = products.countries()
+
+    /** The food a barcode belongs to: one of the user's own first, then the country files. */
+    suspend fun foodByBarcode(code: String): Food? =
+        dao.foodByBarcode(code)?.toCore() ?: products.product(code)?.toCore()?.toFood()
+
+    /** Products already used, so they show among recent foods. */
+    suspend fun productFoods(barcodes: List<String>): List<Food> =
+        if (barcodes.isEmpty()) emptyList() else barcodes.chunked(500).flatMap { products.products(it) }.distinctBy { it.barcode }.map { it.toCore().toFood() }
+
+    suspend fun importCountry(resolver: android.content.ContentResolver, uri: android.net.Uri, now: Long, progress: (Int) -> Unit) =
+        CountryFiles.import(db, resolver, uri, now, progress)
+
+    suspend fun removeCountry(name: String) = db.withTransaction {
+        products.deleteCountryProducts(name)
+        products.deleteCountry(name)
+    }
+
     /** Takes a food off the lists. What was already logged keeps its numbers. */
     suspend fun deleteFood(id: Long) = dao.hideFood(id)
 
     /** The food an entry came from, built-in or typed in, if it still exists. */
     suspend fun foodOf(entry: DiaryEntry): Food? = when {
+        entry.builtInId?.startsWith(Product.PREFIX) == true -> products.product(entry.builtInId!!.drop(1))?.toCore()?.toFood()
         entry.builtInId != null -> builtInFood(entry.builtInId!!)
         entry.foodId != null -> dao.food(entry.foodId!!)?.toCore()
         else -> null

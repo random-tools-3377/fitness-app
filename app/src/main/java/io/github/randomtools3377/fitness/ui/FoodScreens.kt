@@ -74,7 +74,7 @@ private class PortionInput(label: String, amount: String) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, back: () -> Unit, saved: (Food) -> Unit) {
+fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode: String? = null, back: () -> Unit, saved: (Food) -> Unit) {
     val units by vm.units.collectAsState()
     val scope = rememberCoroutineScope()
     var loadedId by remember { mutableStateOf<Long?>(null) }
@@ -91,6 +91,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, back: (
     var fatText by remember { mutableStateOf("") }
     val portions = remember { mutableStateListOf<PortionInput>() }
     var problems by remember { mutableStateOf<List<String>>(emptyList()) }
+    var code by remember { mutableStateOf(barcode) }
 
     LaunchedEffect(editId) {
         if (editId != null && loadedId != editId) {
@@ -102,6 +103,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, back: (
                 proteinText = formatAmount(f.per100.protein)
                 carbsText = formatAmount(f.per100.carbs)
                 fatText = formatAmount(f.per100.fat)
+                code = f.barcode
                 portions.clear()
                 f.portions.forEach { portions.add(PortionInput(it.label, formatAmount(it.amount))) }
             }
@@ -135,7 +137,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, back: (
             val label = servingLabel.trim().ifBlank { "1 serving" }
             if (list.none { it.label == label }) list.add(0, Portion(label, size!!))
         }
-        val food = Food(id = editId ?: 0, name = name.trim(), brand = brand.trim(), unit = unit, per100 = per100, portions = list)
+        val food = Food(id = editId ?: 0, name = name.trim(), brand = brand.trim(), unit = unit, per100 = per100, portions = list, barcode = code)
         scope.launch { saved(vm.saveFood(food)) }
     }
 
@@ -152,6 +154,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, back: (
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).testTag("food-form"),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            code?.let { Text("Barcode $it: scanning it finds this food from now on.", style = MaterialTheme.typography.bodySmall) }
             TextInput(name, { name = it }, "Name", "field:name")
             TextInput(brand, { brand = it }, "Brand (optional)", "field:brand")
             Text("Measured in", style = MaterialTheme.typography.labelLarge)
@@ -255,6 +258,7 @@ fun FoodsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
             }
             HorizontalDivider()
         }
+        item { CountryFilesSection(vm) }
         item {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Your foods", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))

@@ -9,3 +9,6 @@ android.permission.POST_NOTIFICATIONS
 android.permission.USE_EXACT_ALARM
 android.permission.SCHEDULE_EXACT_ALARM
 android.permission.VIBRATE
+
+# Barcode scanning (0.3.0), asked for the first time the user scans. ZXing reads the image on the phone.
+android.permission.CAMERA

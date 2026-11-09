@@ -33,7 +33,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -49,6 +51,7 @@ import io.github.randomtools3377.fitness.core.formatAmount
 fun sourceOf(food: Food): String = when (food.builtInId?.firstOrNull()) {
     null -> "Your food"
     'C' -> "European (CIQUAL)"
+    'P' -> "Packaged (Open Food Facts)"
     else -> "USDA"
 }
 
@@ -60,7 +63,7 @@ fun AddFoodScreen(
     openFoodKey: String?,
     modifier: Modifier,
     back: () -> Unit,
-    newFood: () -> Unit,
+    newFood: (barcode: String?) -> Unit,
 ) {
     val query by vm.query.collectAsState()
     val results by vm.results.collectAsState()
@@ -72,6 +75,14 @@ fun AddFoodScreen(
     val european by vm.hasEuropeanFoods.collectAsState()
     var picked by remember { mutableStateOf<Food?>(null) }
     var quick by remember { mutableStateOf(false) }
+    var notFound by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val scan = rememberScanner { code ->
+        if (code != null) scope.launch {
+            val f = vm.foodForBarcode(code)
+            if (f != null) picked = f else notFound = code
+        }
+    }
 
     DisposableEffect(Unit) { onDispose { vm.query.value = "" } }
 
@@ -99,7 +110,8 @@ fun AddFoodScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("search"),
         )
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = newFood, modifier = Modifier.testTag("new-food")) { Text("From a label") }
+            OutlinedButton(onClick = scan, modifier = Modifier.testTag("scan")) { Text("Scan") }
+            OutlinedButton(onClick = { newFood(null) }, modifier = Modifier.testTag("new-food")) { Text("From a label") }
             OutlinedButton(onClick = { quick = true }, modifier = Modifier.testTag("quick-add")) { Text("Quick add") }
         }
         LazyColumn(Modifier.fillMaxSize().testTag("food-list")) {
@@ -159,6 +171,9 @@ fun AddFoodScreen(
             onConfirm = { a -> vm.log(f, a, meal); picked = null; back() },
             onDismiss = { picked = null },
         )
+    }
+    notFound?.let { code ->
+        BarcodeNotFoundDialog(code, onTypeIn = { notFound = null; newFood(io.github.randomtools3377.fitness.core.Products.normalize(code) ?: code) }, onDismiss = { notFound = null })
     }
     if (quick) {
         QuickAddDialog(

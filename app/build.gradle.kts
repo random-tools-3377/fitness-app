@@ -94,6 +94,8 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.kotlinx.coroutines.core)
+    // Barcode scanning (0.3.0): ZXing, Apache-2.0, works offline.
+    implementation(libs.zxing.android.embedded)
 
     testImplementation(libs.junit)
 

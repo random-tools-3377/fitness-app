@@ -45,7 +45,7 @@ sealed interface Route {
     data class AddFood(val meal: Meal, val openFoodKey: String? = null) : Route
 
     /** Typing in a food from its label: a new one, or changing [editId]. Adds it to [meal] after. */
-    data class FoodForm(val editId: Long? = null, val meal: Meal? = null) : Route
+    data class FoodForm(val editId: Long? = null, val meal: Meal? = null, val barcode: String? = null) : Route
 
     /** Copying a meal ([meal]), or a whole day, from another day to the day shown. */
     data class Copy(val meal: Meal?) : Route
@@ -115,10 +115,10 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel) {
             is Route.AddFood -> AddFoodScreen(
                 vm, top.meal, top.openFoodKey, modifier,
                 back = ::back,
-                newFood = { open(Route.FoodForm(meal = top.meal)) },
+                newFood = { code -> open(Route.FoodForm(meal = top.meal, barcode = code)) },
             )
             is Route.FoodForm -> FoodFormScreen(
-                vm, top.editId, modifier,
+                vm, top.editId, modifier, barcode = top.barcode,
                 back = ::back,
                 saved = { food ->
                     back()

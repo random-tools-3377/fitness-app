@@ -106,17 +106,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val hasEuropeanFoods: StateFlow<Boolean> = builtIns.map { list -> list.any { it.builtInId?.startsWith("C") == true } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    // Barcodes and country files (0.3.0).
+
+    val countries: StateFlow<List<io.github.randomtools3377.fitness.data.CountryRow>> =
+        repo.countries.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Products read so far while a country file is being added, or null when none is. */
+    val countryImport = MutableStateFlow<Int?>(null)
+
+    fun importCountry(uri: Uri) {
+        if (countryImport.value != null) return
+        countryImport.value = 0
+        viewModelScope.launch {
+            try {
+                val (name, count) = repo.importCountry(getApplication<Application>().contentResolver, uri, now()) { countryImport.value = it }
+                message.value = "Added $name: ${io.github.randomtools3377.fitness.core.Units.grouped(count)} products"
+            } catch (e: io.github.randomtools3377.fitness.data.CountryFiles.NotACountryFile) {
+                message.value = e.message
+            } catch (e: Exception) {
+                message.value = "That file could not be read. Download it again and try once more."
+            } finally {
+                countryImport.value = null
+            }
+        }
+    }
+
+    fun removeCountry(name: String) = launchSafely {
+        repo.removeCountry(name)
+        message.value = "Removed $name"
+    }
+
+    /** The food for a scanned barcode, or null if it is in no country file and none of your foods. */
+    suspend fun foodForBarcode(raw: String): Food? {
+        val code = io.github.randomtools3377.fitness.core.Products.normalize(raw) ?: return null
+        return repo.foodByBarcode(code)
+    }
+
+    /** Products from country files that were logged before, so they show among recent foods. */
+    private val usedProducts: StateFlow<List<Food>> = usage.map { u ->
+        repo.productFoods(u.keys.filter { it.startsWith("b:P") }.map { it.removePrefix("b:P") })
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     /** What is typed in the food search. */
     val query = MutableStateFlow("")
 
     /** Search results for [query]: the user's foods and the built-in ones, best first. */
-    val results: StateFlow<List<Food>> = combine(query.debounce(120), foods, builtIns, usage) { q, mine, built, used ->
-        FoodSearch.search(q, mine + built, used, now())
+    val results: StateFlow<List<Food>> = combine(query.debounce(120), foods, builtIns, usage, usedProducts) { q, mine, built, used, products ->
+        FoodSearch.search(q, mine + products + built, used, now())
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Foods used before, the most recent and most used first. */
-    val recent: StateFlow<List<Food>> = combine(foods, builtIns, usage) { mine, built, used ->
-        FoodSearch.recent(mine + built, used, now()).take(30)
+    val recent: StateFlow<List<Food>> = combine(foods, builtIns, usage, usedProducts) { mine, built, used, products ->
+        FoodSearch.recent(mine + products + built, used, now()).take(30)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {

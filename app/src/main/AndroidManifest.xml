@@ -50,6 +50,12 @@
             </intent-filter>
         </activity>
 
+        <!-- The barcode scanner (ZXing, works offline), turning with the phone. -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="fullSensor"
+            tools:replace="android:screenOrientation" />
+
         <!-- The rest timer's alarm. -->
         <receiver
             android:name=".workout.RestDoneReceiver"

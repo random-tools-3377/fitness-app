@@ -52,6 +52,8 @@ data class FoodRow(
     val portions: String,
     val createdAt: Long,
     val hidden: Boolean = false,
+    /** Version 3 (0.3.0): the barcode of a typed-in food, so scanning finds it. */
+    val barcode: String? = null,
 )
 
 @Entity(tableName = "entries", indices = [Index("day")])
@@ -222,6 +224,9 @@ interface FitnessDao {
 
     @Update
     suspend fun updateFood(food: FoodRow)
+
+    @Query("SELECT * FROM foods WHERE barcode = :barcode AND hidden = 0 LIMIT 1")
+    suspend fun foodByBarcode(barcode: String): FoodRow?
 
     @Query("UPDATE foods SET hidden = 1 WHERE id = :id")
     suspend fun hideFood(id: Long)
@@ -423,13 +428,16 @@ interface FitnessDao {
         FoodRow::class, EntryRow::class, SavedMealRow::class, SavedMealItemRow::class, WaterRow::class, WeighInRow::class, SettingRow::class,
         // Version 2 (0.2.0): workouts.
         ExerciseRow::class, RestRow::class, WorkoutRow::class, WorkoutSetRow::class, SavedWorkoutRow::class, SavedWorkoutItemRow::class,
+        // Version 3 (0.3.0): barcodes and country files.
+        ProductRow::class, CountryRow::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
+    abstract fun productDao(): ProductDao
 
     companion object {
         const val NAME = "fitness.db"
@@ -446,13 +454,13 @@ fun dayOf(n: Long): LocalDate = LocalDate.fromEpochDays(n.toInt())
 
 fun FoodRow.toCore() = Food(
     id = id, name = name, brand = brand, unit = BaseUnit.valueOf(unit),
-    per100 = Nutrients(kcal, protein, carbs, fat), portions = PortionText.decode(portions), hidden = hidden,
+    per100 = Nutrients(kcal, protein, carbs, fat), portions = PortionText.decode(portions), hidden = hidden, barcode = barcode,
 )
 
 fun Food.toRow(createdAt: Long) = FoodRow(
     id = id, name = name, brand = brand, unit = unit.name,
     kcal = per100.kcal, protein = per100.protein, carbs = per100.carbs, fat = per100.fat,
-    portions = PortionText.encode(portions), createdAt = createdAt, hidden = hidden,
+    portions = PortionText.encode(portions), createdAt = createdAt, hidden = hidden, barcode = barcode,
 )
 
 fun EntryRow.toCore() = DiaryEntry(
