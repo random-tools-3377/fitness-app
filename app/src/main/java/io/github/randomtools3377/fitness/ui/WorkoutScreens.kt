@@ -292,6 +292,8 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     var menu by remember { mutableStateOf(false) }
     var restFor by remember { mutableStateOf<Exercise?>(null) }
     var platesFor by remember { mutableStateOf<Int?>(null) }
+    // Bumped when a hint fills in the sets, so their boxes show the new numbers.
+    var refills by remember { mutableStateOf(0) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val context = LocalContext.current
 
@@ -364,12 +366,12 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                         if (h != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(h.text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).testTag("hint:$i"))
-                                TextButton(onClick = { wvm.applyHint(i, h) }, modifier = Modifier.testTag("use-hint:$i")) { Text("Use it") }
+                                TextButton(onClick = { wvm.applyHint(i, h); refills++ }, modifier = Modifier.testTag("use-hint:$i")) { Text("Use it") }
                             }
                         }
                     }
                     SetHeader(we.exercise.kind, units)
-                    we.sets.forEachIndexed { j, s -> SetRow(w.id, i, j, we.exercise.kind, s, units, wvm, "${w.exercises.size}:${we.sets.size}") }
+                    we.sets.forEachIndexed { j, s -> SetRow(w.id, i, j, we.exercise.kind, s, units, wvm, "${w.exercises.size}:${we.sets.size}:$refills") }
                     TextButton(onClick = { wvm.addSet(i) }, modifier = Modifier.testTag("add-set:$i")) { Text("+ Add a set") }
                 }
             }
