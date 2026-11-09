@@ -94,7 +94,9 @@ class TodayWidget : AppWidgetProvider() {
                     views.setTextViewText(R.id.widget_detail, if (left >= 0) "left today" else "over today")
                 }
                 val water = repo.waterOn(day)
-                views.setTextViewText(
+                val waterOn = io.github.randomtools3377.fitness.core.Feature.WATER in io.github.randomtools3377.fitness.core.Features.enabled(s)
+                views.setViewVisibility(R.id.widget_add_water, if (waterOn) android.view.View.VISIBLE else android.view.View.GONE)
+                if (waterOn) views.setTextViewText(
                     R.id.widget_water,
                     "Water ${Units.volume(water.toDouble(), units.volume)} of ${Units.volume(s.water.targetMl.toDouble(), units.volume)}",
                 )

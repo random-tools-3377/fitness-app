@@ -152,8 +152,10 @@ fun MeasurementsScreen(bvm: BodyViewModel, modifier: Modifier) {
     val (takePhoto, choosePhoto) = rememberPhotoSource(onPicked = { bvm.addPhoto(it, today) }, onProblem = { bvm.message.value = it })
     val latest = Measurements.latest(all)
 
+    val features = LocalFeatures.current
+    val body = io.github.randomtools3377.fitness.core.Feature.BODY in features
     LazyColumn(modifier.fillMaxSize().testTag("body-list")) {
-        item {
+        if (body) item {
             Section("Measure") {
                 Text("Fill in any you like. Measure the same way each time, like first thing in the morning.", style = MaterialTheme.typography.bodySmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -176,7 +178,7 @@ fun MeasurementsScreen(bvm: BodyViewModel, modifier: Modifier) {
                 ) { Text("Save") }
             }
         }
-        if (latest.isNotEmpty()) {
+        if (body && latest.isNotEmpty()) {
             item {
                 Section("Latest") {
                     for (k in MeasureKind.entries) {
@@ -195,8 +197,8 @@ fun MeasurementsScreen(bvm: BodyViewModel, modifier: Modifier) {
                 }
             }
         }
-        if (bodySettings.cycleOn) item { CycleSection(bvm) }
-        item {
+        if (io.github.randomtools3377.fitness.core.Feature.CYCLE in features) item { CycleSection(bvm) }
+        if (body) item {
             Section("Progress photos") {
                 Text(
                     "Kept only inside the app on this phone: not in the gallery, not in exports or backups. " +
@@ -217,7 +219,7 @@ fun MeasurementsScreen(bvm: BodyViewModel, modifier: Modifier) {
                 }
             }
         }
-        if (all.isNotEmpty()) {
+        if (body && all.isNotEmpty()) {
             item { Text("All measurements", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(16.dp, 8.dp)) }
             items(all.reversed(), key = { "m:${it.id}" }) { m ->
                 Row(
@@ -302,8 +304,9 @@ fun HabitsScreen(bvm: BodyViewModel, kcalByDay: Map<LocalDate, Double>, modifier
     val units by bvm.units.collectAsState()
     var name by remember { mutableStateOf("") }
     val today = bvm.today()
+    val features = LocalFeatures.current
     LazyColumn(modifier.fillMaxSize().testTag("habits-list")) {
-        item {
+        if (io.github.randomtools3377.fitness.core.Feature.HABITS in features) item {
             Section("Your habits") {
                 Text("Tick them each day in the diary. Each one gets a streak, like the built-in ones.", style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -337,8 +340,8 @@ fun HabitsScreen(bvm: BodyViewModel, kcalByDay: Map<LocalDate, Double>, modifier
                 }
             }
         }
-        item { SupplementsSection(bvm) }
-        item {
+        if (io.github.randomtools3377.fitness.core.Feature.SUPPLEMENTS in features) item { SupplementsSection(bvm) }
+        if (io.github.randomtools3377.fitness.core.Feature.SLEEP_MOOD in features) item {
             Section("Sleep and mood, the last 14 days") {
                 Text("Next to what you ate, to spot patterns. Fill them in on the diary.", style = MaterialTheme.typography.bodySmall)
                 Row {

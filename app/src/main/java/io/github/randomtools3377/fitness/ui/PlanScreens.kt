@@ -63,10 +63,16 @@ import kotlinx.datetime.plus
 @Composable
 fun PlanScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
     val part by vm.planPart.collectAsState()
+    // Only the parts that are on (0.15.0).
+    val parts = buildList {
+        if (on(io.github.randomtools3377.fitness.core.Feature.PLANNING)) { add("meals"); add("shopping"); add("recipes") }
+        if (on(io.github.randomtools3377.fitness.core.Feature.FASTING)) add("fasting")
+    }
+    androidx.compose.runtime.LaunchedEffect(parts) { if (part !in parts && parts.isNotEmpty()) vm.planPart.value = parts.first() }
     Column(modifier.fillMaxSize()) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        if (parts.size > 1) Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Choices(
-                listOf("meals", "shopping", "recipes", "fasting"), part,
+                parts, part,
                 { when (it) { "meals" -> "Meals"; "shopping" -> "Shopping list"; "recipes" -> "Recipes"; else -> "Fasting" } },
                 { "plan:$it" },
             ) { vm.planPart.value = it }

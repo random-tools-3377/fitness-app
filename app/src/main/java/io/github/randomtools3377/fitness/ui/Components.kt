@@ -131,3 +131,10 @@ fun LabelValue(label: String, value: String, tag: String? = null) {
         Text(value, style = MaterialTheme.typography.bodyMedium, modifier = if (tag != null) Modifier.testTag(tag) else Modifier)
     }
 }
+
+/** The parts of the app that are on (0.15.0), so any screen can leave out what's off. */
+val LocalFeatures = androidx.compose.runtime.compositionLocalOf { io.github.randomtools3377.fitness.core.Features.STARTS_ON }
+
+/** Whether [f] is on. */
+@Composable
+fun on(f: io.github.randomtools3377.fitness.core.Feature): Boolean = f in LocalFeatures.current

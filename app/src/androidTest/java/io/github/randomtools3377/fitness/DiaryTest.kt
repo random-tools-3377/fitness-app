@@ -21,11 +21,13 @@ import org.junit.runner.RunWith
  * Starts each test with no data, the way the app is after installing, but with metric units and
  * kcal whatever the emulator's region, so the numbers below are the same everywhere.
  */
-class FreshDatabase : ExternalResource() {
+class FreshDatabase(private val allFeatures: Boolean = true) : ExternalResource() {
     override fun before() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as FitnessApplication
         app.container.db.clearAllTables()
-        runBlocking { app.container.repository.updateSettings { it.copy(units = UnitSettings()) } }
+        // Every part of the app on (0.15.0), so each test finds what it tests; or a new install's simple start.
+        val features = if (allFeatures) io.github.randomtools3377.fitness.core.Feature.entries.map { it.name }.toSet() else null
+        runBlocking { app.container.repository.updateSettings { it.copy(units = UnitSettings(), features = features, cycleOn = allFeatures) } }
     }
 }
 

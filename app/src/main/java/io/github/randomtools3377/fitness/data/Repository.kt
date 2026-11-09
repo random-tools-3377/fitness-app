@@ -307,6 +307,22 @@ class Repository(private val context: Context, val db: AppDatabase) {
         )
     }
 
+    /** What the data shows is in use, for the first choice of parts to show (0.15.0). */
+    suspend fun featureUse(): io.github.randomtools3377.fitness.core.FeatureUse {
+        val habits = well.allHabits()
+        return io.github.randomtools3377.fitness.core.FeatureUse(
+            hasCountries = products.countries().first().isNotEmpty(),
+            hasBarcodeFoods = dao.allFoods().any { it.barcode != null },
+            hasRecipesOrPlans = dao.allRecipes().isNotEmpty() || dao.allEntries().any { it.planned } || dao.allShopping().isNotEmpty(),
+            hasFasts = dao.allFasts().isNotEmpty(),
+            hasMeasurementsOrPhotos = well.allMeasurements().isNotEmpty() || well.photos().first().isNotEmpty(),
+            hasSleepOrMood = well.allDayNotes().isNotEmpty(),
+            hasHabits = habits.any { it.kind == "HABIT" },
+            hasSupplements = habits.any { it.kind == "SUPPLEMENT" },
+            hasPeriods = well.allPeriods().isNotEmpty(),
+        )
+    }
+
     // Export and import.
     suspend fun export(now: Long): String {
         val backup = db.withTransaction {

@@ -81,6 +81,11 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
     }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("settings")) {
+        // Which parts of the app show (0.15.0).
+        Section("Features") {
+            Text("Choose what the app shows. Switching a part off hides it without deleting anything.", style = MaterialTheme.typography.bodySmall)
+            Button(onClick = { open(Route.Features) }, modifier = Modifier.testTag("open-features")) { Text("Choose features") }
+        }
         Section("Daily calorie target") {
             Text(
                 settings.targetKcal?.let { energy(it.toDouble(), units) } ?: "Not set yet",
@@ -93,12 +98,12 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
         }
 
         MacroSection(settings.macros, settings.targetKcal ?: 2000, onSave = vm::setMacros)
-        MealSplitSection(vm, settings)
-        DayTargetsSection(vm, settings)
-        ExtraTargetsSection(vm, settings)
-        WaterSection(settings.water, units.volume, onSave = vm::setWater)
+        if (on(io.github.randomtools3377.fitness.core.Feature.MEAL_TARGETS)) MealSplitSection(vm, settings)
+        if (on(io.github.randomtools3377.fitness.core.Feature.DAY_TARGETS)) DayTargetsSection(vm, settings)
+        if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS) || on(io.github.randomtools3377.fitness.core.Feature.ALCOHOL_CAFFEINE)) ExtraTargetsSection(vm, settings)
+        if (on(io.github.randomtools3377.fitness.core.Feature.WATER)) WaterSection(settings.water, units.volume, onSave = vm::setWater)
 
-        Section("Workouts") {
+        if (on(io.github.randomtools3377.fitness.core.Feature.WORKOUTS)) Section("Workouts") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Count only half of the calories burned")
@@ -110,10 +115,10 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
                 Switch(checked = settings.burnedHalf, onCheckedChange = { vm.setBurnedHalf(it) }, modifier = Modifier.testTag("burned-half"))
             }
             WorkoutsPerWeekRow(vm, settings)
-            PlatesRow(vm, settings)
+            if (on(io.github.randomtools3377.fitness.core.Feature.TRAINING_EXTRAS)) PlatesRow(vm, settings)
         }
 
-        StepsSection(vm, settings)
+        if (on(io.github.randomtools3377.fitness.core.Feature.STEPS)) StepsSection(vm, settings)
         ThemeSection(vm, settings)
         RemindersSection(vm, settings)
         PrivacySection(vm, settings)
