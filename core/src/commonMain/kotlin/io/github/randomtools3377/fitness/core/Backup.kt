@@ -19,6 +19,16 @@ data class AppSettings(
     val units: UnitSettings? = null,
     /** Count only half of the calories workouts burn, as estimates tend to run high (format 2). */
     val burnedHalf: Boolean = false,
+    /** Workouts a week for the weekly streak (0.4.0). */
+    val workoutsPerWeek: Int = Streaks.DEFAULT_WEEKLY_WORKOUTS,
+    /** Reminders, all off to start (0.4.0). */
+    val reminders: ReminderSettings = ReminderSettings(),
+    /** The tabs behind the phone's lock, by name, like "WEIGHT" (0.4.0). Empty: no lock. */
+    val locked: Set<String> = emptySet(),
+    /** A target for each meal (0.6.0). */
+    val mealSplit: MealSplit = MealSplit(),
+    /** The fasting plan last chosen, in hours (0.6.0). */
+    val fastHours: Double = 16.0,
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

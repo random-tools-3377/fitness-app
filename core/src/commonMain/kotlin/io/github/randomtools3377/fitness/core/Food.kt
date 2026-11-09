@@ -49,6 +49,8 @@ data class Food(
     val portions: List<Portion> = emptyList(),
     /** A typed-in food the user deleted: off the lists, but kept for the entries that used it. */
     val hidden: Boolean = false,
+    /** The barcode of a typed-in food, so scanning it again finds it (0.3.0). */
+    val barcode: String? = null,
 ) {
     /** The same food is the same key, whether typed in or built in. */
     val key: String get() = builtInId?.let { "b:$it" } ?: "u:$id"

@@ -39,6 +39,8 @@ data class Profile(
     val goal: WeightGoal = WeightGoal.KEEP,
     /** Kilograms a week to lose or gain: 0.25, 0.5 or 0.75. Ignored when keeping. */
     val kgPerWeek: Double = 0.5,
+    /** The weight aimed for, if any, for the stats (0.4.0). */
+    val goalWeightKg: Double? = null,
 )
 
 /** The worked-out daily calorie target and how it was reached, for showing the sums. */

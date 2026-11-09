@@ -31,6 +31,8 @@ data class DiaryEntry(
     val nutrients: Nutrients,
     /** Epoch milliseconds when it was logged. */
     val createdAt: Long = 0,
+    /** Planned ahead and not eaten yet (0.5.0): shown on the plan, not counted in the day. */
+    val planned: Boolean = false,
 ) {
     val isQuickAdd: Boolean get() = foodId == null && builtInId == null
 
@@ -83,8 +85,10 @@ object Diary {
 data class DayTotals(val byMeal: Map<Meal, Nutrients>, val total: Nutrients) {
     companion object {
         fun of(entries: List<DiaryEntry>): DayTotals {
-            val byMeal = Meal.entries.associateWith { m -> entries.filter { it.meal == m }.map { it.nutrients }.total() }
-            return DayTotals(byMeal, entries.map { it.nutrients }.total())
+            // Planned items don't count until they are ticked as eaten.
+            val eaten = entries.filter { !it.planned }
+            val byMeal = Meal.entries.associateWith { m -> eaten.filter { it.meal == m }.map { it.nutrients }.total() }
+            return DayTotals(byMeal, eaten.map { it.nutrients }.total())
         }
     }
 }
