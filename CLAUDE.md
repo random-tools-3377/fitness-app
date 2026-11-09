@@ -237,9 +237,54 @@ Build order **(default)**, each step a Release the owner can try:
   shopping list, recipes, fasting) and Progress (stats and streaks, weight). Settings opens from
   the gear button at the top of the diary.
 
-## Not decided yet
+## More, after 0.6.0
 
-- A home-screen widget; reading steps from the phone (Health Connect, which works offline).
+Decided on 2026-11-09: everything below is added.
+
+- **More nutrients:** fibre, sugar, salt and saturated fat, as EU labels list them, with optional
+  daily targets **(default: shown on each food and day; targets off until set; salt in g, from
+  sodium × 2.5 where a table gives only sodium)**. Foods logged before keep what they had.
+- **Favourites:** foods starred by the user, always at the top of the food search.
+- **"Same as yesterday":** one tap copies a meal from the day before.
+- **Reading a label with the camera:** the phone reads the nutrition numbers off a label and fills
+  in the typed-in food form, for the user to check before saving. This is text recognition, not
+  guessing a meal, and it runs on the phone **(default: Tesseract, Apache-2.0, through
+  Tesseract4Android, with its English data bundled; not Google's ML Kit)**.
+- **Body measurements:** waist, hips, chest, arms, thighs and neck, and body-fat % if known, each
+  with a chart **(default: any of them, whenever the user likes)**.
+- **Progress photos:** kept only in the app's own storage on the phone, behind the privacy lock
+  when Progress is locked, never in the export file **(default; the user can save one out
+  through the system dialog)**.
+- **Sleep and mood:** a note on a day: hours slept and a mood from 1 to 5, with a chart next to
+  calories **(default)**.
+- **Weekly check-in:** once a week the Progress tab sums up the average weight change against
+  the plan and offers a new target if it is off by 50 kcal or more, never changing it by itself
+  **(default: on Mondays)**.
+- **Your own habits:** the user adds habits ("no sugary drinks", "stretch 10 minutes"), ticks them
+  each day, and each gets a streak like the built-in ones.
+- **Workout programmes:** a weekly schedule of saved workouts ("Mon: Push, Wed: Pull, Fri: Legs");
+  the Workouts tab suggests today's session.
+- **Plate calculator:** the plates for each side of the bar for a given weight **(default: 20 kg
+  bar; plates 25, 20, 15, 10, 5, 2.5 and 1.25 kg, or 45 lb bar and 45, 35, 25, 10, 5, 2.5 lb;
+  both changeable)**.
+- **"Try a bit more" hints:** when every set last time hit its reps, the next session suggests a
+  little more weight **(default: +2.5 kg or +5 lb)**, or one more rep for bodyweight.
+- **Supersets and warm-up sets:** exercises can be grouped to alternate, and a set can be marked
+  as a warm-up, which counts in neither personal bests nor the total lifted.
+- **Home-screen widget:** today's calories left, water, and buttons to add water or open quick
+  add.
+- **Steps from the phone:** read from Health Connect, which works offline, if the user allows it;
+  shown on the day **(default: steps add calories at weight (kg) × 0.0005 per step, following the
+  half-count setting; a logged walk or run is not counted twice: steps during a logged cardio
+  workout are left out)**.
+- **Theme:** follow the phone, light or dark, and an accent colour.
+- **Spreadsheet export:** the diary, weigh-ins, measurements and workouts saved as CSV files
+  through the system dialog, for reading elsewhere. The backup file stays the way to move data.
+
+Build order **(default)**: 0.7.0 the food ones (nutrients, favourites, same as yesterday,
+reading a label); 0.8.0 body and habits (measurements, photos, sleep and mood, weekly check-in,
+own habits); 0.9.0 workouts (programmes, plate calculator, hints, supersets and warm-ups); 0.10.0
+the widget, steps, theme and spreadsheet export.
 
 ## Talking to the owner
 
