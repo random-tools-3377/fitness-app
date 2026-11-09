@@ -12,7 +12,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 /**
- * Records what the user says for "Say a meal" (0.19.0): 16 kHz mono, at most 30 seconds, kept
+ * Records what the user says for "Say a meal" (0.18.0): 16 kHz mono, at most 30 seconds, kept
  * in memory only and turned into a WAV for the speech model. Nothing is saved.
  */
 class Recorder {
