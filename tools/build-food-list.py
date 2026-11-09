@@ -280,8 +280,11 @@ def usda_row(food, letter):
 
 
 def build_usda(args, work):
-    from_page = usda_files_on_page()
-    print("USDA files on the download page:", from_page or "none found")
+    def have(key):
+        return getattr(args, key) or any(re.fullmatch(USDA_SETS[key][0], n) for n in os.listdir(work))
+
+    from_page = {} if all(have(k) for k in USDA_SETS) else usda_files_on_page()
+    print("USDA files on the download page:", from_page or "not read, or none found")
     rows, used, names = [], [], set()
     for key in USDA_ORDER:
         _, _, top, letter, title = USDA_SETS[key]
@@ -346,16 +349,18 @@ def ciqual_file(given, work):
             return download(url, os.path.join(work, "ciqual-" + os.path.basename(url)))
         except Exception as e:
             print("  Could not download", url, ":", e)
-    sys.exit("No CIQUAL file could be downloaded. Give its address or path with --ciqual.")
+    return None
 
 
 def parse_xml(raw):
-    """Reads a CIQUAL XML file into records ({tag: text}), forgiving its stray "&" characters."""
+    """Reads a CIQUAL XML file into records ({tag: text}), forgiving stray "&" and "<" characters."""
     head = raw[:200].decode("ascii", "replace")
     m = re.search(r'encoding="([^"]+)"', head)
     text = raw.decode(m.group(1) if m else "utf-8", "replace")
     text = re.sub(r"^<\?xml[^>]*\?>", "", text.lstrip("﻿").lstrip())
     text = re.sub(r"&(?!amp;|lt;|gt;|quot;|apos;|#)", "&amp;", text)
+    # Values like "< 0,5" are written with a bare "<", which XML doesn't allow.
+    text = re.sub(r"<(?=[\s0-9.,])", "&lt;", text)
     root = ET.fromstring(text)
     records = []
     for rec in root:
@@ -387,6 +392,11 @@ def find_const(consts, *patterns):
 
 def build_ciqual(args, work):
     path = ciqual_file(args.ciqual, work)
+    if path is None:
+        if args.ciqual_optional:
+            print("::warning::CIQUAL could not be downloaded. The list is made without it.")
+            return [], []
+        sys.exit("No CIQUAL file could be downloaded. Give its address or path with --ciqual.")
     with zipfile.ZipFile(path) as z:
         members = z.namelist()
         print("CIQUAL files:", members)
@@ -441,19 +451,21 @@ def build_ciqual(args, work):
 # ---------------------------------------------------------------------------------------------
 
 
-NOTICE = """\
-The built-in food list (foods.tsv) comes from two government food tables.
-
+NOTICE_USDA = """\
 USDA FoodData Central
   U.S. Department of Agriculture, Agricultural Research Service. FoodData Central.
   https://fdc.nal.usda.gov. In the public domain (CC0 1.0). This app is not endorsed by the USDA.
+"""
 
+NOTICE_CIQUAL = """\
 CIQUAL
   Anses. Ciqual French food composition table. https://ciqual.anses.fr
   Under the Licence Ouverte / Etalab Open Licence 2.0
   (https://www.etalab.gouv.fr/licence-ouverte-open-licence/). Only the English food names and
   the energy, protein, carbohydrate and fat values are used. This app is not endorsed by Anses.
+"""
 
+NOTICE_END = """
 The files used:
 
 %s
@@ -472,6 +484,7 @@ def main():
     for key in USDA_SETS:
         parser.add_argument("--" + key, help="file name of the %s download" % USDA_SETS[key][4])
     parser.add_argument("--ciqual", help="address or path of the CIQUAL XML zip")
+    parser.add_argument("--ciqual-optional", action="store_true", help="make the list without CIQUAL if it can't be had")
     args = parser.parse_args()
     os.makedirs(args.work, exist_ok=True)
     os.makedirs(args.out, exist_ok=True)
@@ -484,7 +497,8 @@ def main():
     rows.sort(key=lambda r: (r[1].lower(), r[0]))
     target = os.path.join(args.out, "foods.tsv")
     with open(target, "w", encoding="utf-8", newline="\n") as f:
-        f.write("# Built-in foods, from USDA FoodData Central (public domain) and CIQUAL (Anses, Licence Ouverte 2.0).\n")
+        sources = "USDA FoodData Central (public domain)" + (" and CIQUAL (Anses, Licence Ouverte 2.0)" if ciqual_rows else "")
+        f.write("# Built-in foods, from %s.\n" % sources)
         f.write("# Made by tools/build-food-list.py. See foods-NOTICE.txt.\n")
         for title, name, kept in used:
             f.write("# %s: %s, %d foods\n" % (title, name, kept))
@@ -495,7 +509,10 @@ def main():
 
     files = "\n".join("  - %s: %s (%d foods)" % u for u in used)
     with open(os.path.join(args.out, "foods-NOTICE.txt"), "w", encoding="utf-8", newline="\n") as f:
-        f.write(NOTICE % files)
+        parts = [NOTICE_USDA] + ([NOTICE_CIQUAL] if ciqual_rows else [])
+        f.write("The built-in food list (foods.tsv) comes from government food tables.\n\n")
+        f.write("\n".join(parts))
+        f.write(NOTICE_END % files)
 
 
 if __name__ == "__main__":
