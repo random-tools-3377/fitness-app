@@ -80,6 +80,9 @@ sealed interface Route {
     data object ActiveWorkout : Route
 
     data object Bests : Route
+
+    /** The interval timer (0.13.0). */
+    data object Intervals : Route
 }
 
 @Composable
@@ -234,6 +237,7 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
             Route.Target -> TargetScreen(vm, modifier, back = ::back)
             Route.ActiveWorkout -> ActiveWorkoutScreen(wvm, modifier, back = ::back)
             Route.Bests -> BestsScreen(wvm, modifier, back = ::back)
+            Route.Intervals -> IntervalScreen(wvm, modifier, back = ::back)
         }
     }
 

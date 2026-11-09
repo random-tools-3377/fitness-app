@@ -148,7 +148,10 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
             }
         }
         item {
-            TextButton(onClick = { open(Route.Bests) }, modifier = Modifier.padding(horizontal = 8.dp).testTag("open-bests")) { Text("Personal bests") }
+            Row(Modifier.padding(horizontal = 8.dp)) {
+                TextButton(onClick = { open(Route.Bests) }, modifier = Modifier.testTag("open-bests")) { Text("Personal bests") }
+                TextButton(onClick = { open(Route.Intervals) }, modifier = Modifier.testTag("open-intervals")) { Text("Interval timer") }
+            }
         }
         item { Text("Saved workouts", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 8.dp)) }
         if (saved.isEmpty()) {
@@ -292,6 +295,8 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     var menu by remember { mutableStateOf(false) }
     var restFor by remember { mutableStateOf<Exercise?>(null) }
     var platesFor by remember { mutableStateOf<Int?>(null) }
+    var noting by remember { mutableStateOf<Exercise?>(null) }
+    val notes by wvm.notes.collectAsState()
     // Bumped when a hint fills in the sets, so their boxes show the new numbers.
     var refills by remember { mutableStateOf(0) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -340,6 +345,14 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(we.exercise.name, style = MaterialTheme.typography.titleMedium)
+                            // The user's own cue for this exercise (0.13.0).
+                            val note = notes[we.exercise.key]
+                            Text(
+                                note ?: "Add a note",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (note == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.clickable { noting = we.exercise }.testTag("note:$i"),
+                            )
                             if (we.exercise.kind != ExerciseKind.CARDIO) {
                                 Text(
                                     "Rest ${Workouts.clock(restTimes[we.exercise.key] ?: Exercises.DEFAULT_REST_SECONDS)}",
@@ -418,6 +431,16 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
             text = { TextInput(name, { name = it }, "Name", "field:workout-name") },
             confirmButton = { TextButton(onClick = { wvm.rename(name); renaming = false }, enabled = name.isNotBlank()) { Text("Save") } },
             dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+        )
+    }
+    noting?.let { e ->
+        var text by remember(e.key) { mutableStateOf(notes[e.key].orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { noting = null },
+            title = { Text("Note for ${e.name}") },
+            text = { TextInput(text, { text = it }, "Like \"elbows in\"", "field:note") },
+            confirmButton = { TextButton(onClick = { wvm.setNote(e.key, text); noting = null }, modifier = Modifier.testTag("save-note")) { Text("Save") } },
+            dismissButton = { TextButton(onClick = { noting = null }) { Text("Cancel") } },
         )
     }
     platesFor?.let { idx ->
@@ -604,6 +627,19 @@ fun BestsScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> Unit) {
                         val reps = list.filter { it.kind.name == "REPS_AT_WEIGHT" }.sortedByDescending { it.atKg }.take(3)
                         for (b in list.filter { it.kind.name != "REPS_AT_WEIGHT" } + reps) {
                             LabelValue(b.kind.title, b.describe(units))
+                        }
+                        // The weights for 1 to 12 reps from the estimated one-rep max (0.13.0).
+                        list.firstOrNull { it.kind == io.github.randomtools3377.fitness.core.BestKind.ONE_REP_MAX }?.let { orm ->
+                            var open by remember { mutableStateOf(false) }
+                            TextButton(onClick = { open = !open }, modifier = Modifier.testTag("rep-table:${e.name}")) {
+                                Text(if (open) "Hide the weights for each number of reps" else "Weights for 1 to 12 reps")
+                            }
+                            if (open) {
+                                for ((reps, kg) in io.github.randomtools3377.fitness.core.RepTable.of(orm.value)) {
+                                    LabelValue("$reps ${if (reps == 1) "rep" else "reps"}", Units.weight(kg, units.weight), tag = "rep:${e.name}:$reps")
+                                }
+                                Text("Estimates from your best, by the Epley formula.", style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }

@@ -49,6 +49,10 @@ data class AppSettings(
     val drinkGrams: Double? = null,
     /** Cycle tracking is on (0.12.0); off to start. */
     val cycleOn: Boolean = false,
+    /** The user's own cues for each exercise, by its key (0.13.0). */
+    val exerciseNotes: Map<String, String> = emptyMap(),
+    /** The interval timer's last plan (0.13.0). */
+    val intervals: IntervalPlan = IntervalPlan.TABATA,
     /** The Monday whose weekly check-in the user has seen and closed (0.8.0). */
     val checkInSeen: kotlinx.datetime.LocalDate? = null,
 ) {
