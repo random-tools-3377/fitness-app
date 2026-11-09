@@ -168,9 +168,10 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
                 return@launch
             }
             if (r.millilitres) unit = BaseUnit.MILLILITRE
-            if (r.perServing && r.servingSize != null) {
+            val size = r.servingSize
+            if (r.perServing && size != null) {
                 basis = Basis.PER_SERVING
-                servingSize = formatAmount(r.servingSize)
+                servingSize = formatAmount(size)
             } else {
                 basis = Basis.PER_100
             }
@@ -184,7 +185,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
             r.salt?.let { saltText = formatAmount(it) }
             reading = buildString {
                 append("Read ${r.found} of 8 numbers")
-                append(if (r.perServing && r.servingSize != null) ", per serving of ${formatAmount(r.servingSize)} ${unit.short}." else ", per 100 ${unit.short}.")
+                append(if (r.perServing && size != null) ", per serving of ${formatAmount(size)} ${unit.short}." else ", per 100 ${unit.short}.")
                 if (r.fibreTakenOff) append(" The label's carbs included fibre, so the fibre was taken off.")
                 append(" Check each one against the label before saving.")
             }
