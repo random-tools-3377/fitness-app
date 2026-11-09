@@ -16,9 +16,9 @@ features locked behind a subscription, and needing the internet for AI.
 - Everything is free and always will be: no subscription, no paywall, no "premium" features, no
   ads, no in-app purchases, no trial.
 - When a feature is one that other apps charge for, it is built here as an ordinary feature.
-- No AI features **(default)**, such as guessing a meal from a photo. Logging is made quick in
-  plain ways instead: recent and frequent foods first, saved meals, copying a meal from another
-  day, and barcodes.
+- Logging is made quick in plain ways first: recent and frequent foods first, saved meals,
+  copying a meal from another day, and barcodes. AI is an optional extra on top, only on the
+  phone (see "On-phone AI").
 
 Designed on 2026-11-09. Plain bullets are the owner's decisions. Bullets marked **(default)** are
 suggestions the owner has not overruled and can still change. Anything not written here is not
@@ -348,6 +348,36 @@ other part can be hidden.
   training extras (the programme, plate calculator, hints, supersets and warm-ups, interval timer
   and exercise notes); and the calendar and year in review. On an update, a part the user has
   already used (has data or settings in) stays on.
+
+## On-phone AI
+
+Decided on 2026-11-09: AI features are added, on these terms.
+
+- Everything works fully without AI. Each AI feature is optional, separate and off until the user
+  turns it on, and nothing else in the app depends on it.
+- It runs only on the phone. The app still has no internet: a model is a one-time download from
+  the Releases page, opened in the app the same way as a country file.
+- AI only suggests. The user checks every suggestion before anything is logged or saved.
+- No medical advice, and no guessing about the user's body.
+- The features: describing a meal in words or by voice ("two eggs and a slice of toast"),
+  matched to foods; suggesting foods from a photo of a plate; pasting a recipe's text to make a
+  recipe; reading labels better than Tesseract; and a weekly summary in plain words. No camera
+  rep counter.
+- **Details (default):**
+  - The models are files on a "models" Release, each with its licence and credit, using only
+    models whose licences let them be passed on (Apache-2.0, MIT or similar): a small text model
+    for meals, recipes and the summary (Qwen2.5 1.5B Instruct, run with llama.cpp); a speech model
+    for voice (Whisper, run with whisper.cpp); a small vision model for plate photos (SmolVLM);
+    and PaddleOCR's mobile models for labels.
+  - The model only picks words; the app's own food data gives the numbers. A meal or recipe
+    becomes foods from the user's foods and the built-in lists, with amounts, shown as a list to
+    tick and change. Plate photos only suggest foods; the amounts are the user's.
+  - The weekly summary words the numbers the app has already worked out, and the user can
+    read the numbers beside it.
+  - On the Features page under "AI on this phone", each with its download size, and a note when
+    a phone is likely too slow.
+  - Build order: 0.16.0 better label reading; 0.17.0 describing a meal, pasting a recipe and the
+    weekly summary; 0.18.0 voice; 0.19.0 plate photos.
 
 ## Talking to the owner
 
