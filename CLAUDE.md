@@ -8,6 +8,18 @@ wherever possible: they share only the GitHub organisation. Its own repository, 
 key, its own data and settings, and no links between the apps. Code or scripts that would be
 useful in both are copied, not shared.
 
+## Free, and nothing held back
+
+The point of the app is what other calorie and workout apps do well, without what they get wrong:
+features locked behind a subscription, and needing the internet for AI.
+
+- Everything is free and always will be: no subscription, no paywall, no "premium" features, no
+  ads, no in-app purchases, no trial.
+- When a feature is one that other apps charge for, it is built here as an ordinary feature.
+- No AI features **(default)**, such as guessing a meal from a photo. Logging is made quick in
+  plain ways instead: recent and frequent foods first, saved meals, copying a meal from another
+  day, and barcodes.
+
 Designed on 2026-11-09. Plain bullets are the owner's decisions. Bullets marked **(default)** are
 suggestions the owner has not overruled and can still change. Anything not written here is not
 decided, so ask the owner rather than filling it in.
@@ -59,6 +71,7 @@ workouts or exports.
   - Amounts in grams or millilitres, or in the food's own portions ("1 slice", "1 cup").
   - Quick add: just a number of calories, with no food.
   - The most recent and most used foods come first.
+  - A meal, or a whole day, can be copied from another day.
 - Each food and each day shows calories and also protein, carbs and fat.
 
 ## Targets
