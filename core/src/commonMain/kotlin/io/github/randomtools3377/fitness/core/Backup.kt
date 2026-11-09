@@ -53,6 +53,8 @@ data class AppSettings(
     val exerciseNotes: Map<String, String> = emptyMap(),
     /** The interval timer's last plan (0.13.0). */
     val intervals: IntervalPlan = IntervalPlan.TABATA,
+    /** The parts of the app that are on, by [Feature] name; null until first set (0.15.0). */
+    val features: Set<String>? = null,
     /** The Monday whose weekly check-in the user has seen and closed (0.8.0). */
     val checkInSeen: kotlinx.datetime.LocalDate? = null,
 ) {
