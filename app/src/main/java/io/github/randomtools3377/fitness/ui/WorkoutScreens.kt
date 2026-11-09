@@ -91,6 +91,7 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
     var cardio by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<Workout?>(null) }
     var planning by remember { mutableStateOf(false) }
+    val extras = on(io.github.randomtools3377.fitness.core.Feature.TRAINING_EXTRAS)
     val programme by wvm.programme.collectAsState()
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -119,7 +120,7 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
         if (active == null) {
             // Today's workout from the weekly programme (0.9.0).
             val todays = io.github.randomtools3377.fitness.core.Programme.today(programme, saved, wvm.todayDate())
-            item {
+            if (extras) item {
                 Section("Weekly programme") {
                     if (programme.isEmpty()) {
                         Text("Plan which saved workout to do on which days, like Push on Monday and Legs on Friday.", style = MaterialTheme.typography.bodySmall)
@@ -150,7 +151,7 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
         item {
             Row(Modifier.padding(horizontal = 8.dp)) {
                 TextButton(onClick = { open(Route.Bests) }, modifier = Modifier.testTag("open-bests")) { Text("Personal bests") }
-                TextButton(onClick = { open(Route.Intervals) }, modifier = Modifier.testTag("open-intervals")) { Text("Interval timer") }
+                if (extras) TextButton(onClick = { open(Route.Intervals) }, modifier = Modifier.testTag("open-intervals")) { Text("Interval timer") }
             }
         }
         item { Text("Saved workouts", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 8.dp)) }
@@ -296,6 +297,7 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     var restFor by remember { mutableStateOf<Exercise?>(null) }
     var platesFor by remember { mutableStateOf<Int?>(null) }
     var noting by remember { mutableStateOf<Exercise?>(null) }
+    val extras = on(io.github.randomtools3377.fitness.core.Feature.TRAINING_EXTRAS)
     val notes by wvm.notes.collectAsState()
     // Bumped when a hint fills in the sets, so their boxes show the new numbers.
     var refills by remember { mutableStateOf(0) }
@@ -347,7 +349,7 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                             Text(we.exercise.name, style = MaterialTheme.typography.titleMedium)
                             // The user's own cue for this exercise (0.13.0).
                             val note = notes[we.exercise.key]
-                            Text(
+                            if (extras) Text(
                                 note ?: "Add a note",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (note == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -362,7 +364,7 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                                 )
                             }
                         }
-                        ExerciseMenu(w, i, we, wvm, onPlates = { platesFor = i })
+                        if (extras) ExerciseMenu(w, i, we, wvm, onPlates = { platesFor = i })
                         IconButton(onClick = { wvm.removeExercise(i) }) { Icon(Icons.Filled.Close, contentDescription = "Remove exercise") }
                     }
                     we.superset?.let { g ->
@@ -374,7 +376,7 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                         )
                     }
                     // "Try a bit more" (0.9.0), until a set is ticked.
-                    if (we.sets.none { it.done }) {
+                    if (extras && we.sets.none { it.done }) {
                         val h = remember(we.exercise.key, w.id) { wvm.hint(we.exercise) }
                         if (h != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -516,7 +518,7 @@ private fun SetRow(workoutId: Long, i: Int, j: Int, kind: ExerciseKind, s: Worko
         // Tap the number to mark a warm-up set (0.9.0), shown as W.
         Text(
             if (s.warmUp) "W" else "${j + 1}",
-            Modifier.width(36.dp).clickable { wvm.toggleWarmUp(i, j) }.testTag("warmup:$i:$j"),
+            Modifier.width(36.dp).clickable(enabled = on(io.github.randomtools3377.fitness.core.Feature.TRAINING_EXTRAS)) { wvm.toggleWarmUp(i, j) }.testTag("warmup:$i:$j"),
             color = if (s.done) MaterialTheme.colorScheme.outline else if (s.warmUp) MaterialTheme.colorScheme.tertiary else Color.Unspecified,
         )
         when (kind) {

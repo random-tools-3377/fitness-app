@@ -228,8 +228,8 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             code?.let { Text("Barcode $it: scanning it finds this food from now on.", style = MaterialTheme.typography.bodySmall) }
-            Text("Read the numbers from a photo of the label", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (on(io.github.randomtools3377.fitness.core.Feature.LABEL_PHOTO)) Text("Read the numbers from a photo of the label", style = MaterialTheme.typography.labelLarge)
+            if (on(io.github.randomtools3377.fitness.core.Feature.LABEL_PHOTO)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
                     val granted = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
                         android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -272,21 +272,21 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
                 style = MaterialTheme.typography.bodySmall,
             )
             NumberField(fatText, { fatText = it }, "Fat", "field:fat", Modifier.fillMaxWidth(), suffix = "g")
-            Text("Also on the label (optional)", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS) || on(io.github.randomtools3377.fitness.core.Feature.ALCOHOL_CAFFEINE)) Text("Also on the label (optional)", style = MaterialTheme.typography.labelLarge)
+            if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NumberField(satFatText, { satFatText = it }, "of which saturates", "field:satfat", Modifier.weight(1f), suffix = "g")
                 NumberField(sugarText, { sugarText = it }, "of which sugars", "field:sugar", Modifier.weight(1f), suffix = "g")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NumberField(fibreText, { fibreText = it }, "Fibre", "field:fibre", Modifier.weight(1f), suffix = "g")
                 NumberField(saltText, { saltText = it }, "Salt", "field:salt", Modifier.weight(1f), suffix = "g")
             }
-            Text("On a US label, salt is sodium (mg) × 2.5 ÷ 1000.", style = MaterialTheme.typography.bodySmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS)) Text("On a US label, salt is sodium (mg) × 2.5 ÷ 1000.", style = MaterialTheme.typography.bodySmall)
+            if (on(io.github.randomtools3377.fitness.core.Feature.ALCOHOL_CAFFEINE)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NumberField(alcoholText, { alcoholText = it }, "Alcohol", "field:alcohol", Modifier.weight(1f), suffix = "g")
                 NumberField(caffeineText, { caffeineText = it }, "Caffeine", "field:caffeine", Modifier.weight(1f), suffix = "mg")
             }
-            Text(
+            if (on(io.github.randomtools3377.fitness.core.Feature.ALCOHOL_CAFFEINE)) Text(
                 "For drinks: alcohol in grams (a drink of 5% is about 4 g per 100 ml), and caffeine in mg, for the same amount as the numbers above.",
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -315,6 +315,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
 @Composable
 fun FoodsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
     val mine by vm.foods.collectAsState()
+    val features = LocalFeatures.current
     val saved by vm.savedMeals.collectAsState()
     val units by vm.units.collectAsState()
     var deleting by remember { mutableStateOf<Food?>(null) }
@@ -361,7 +362,7 @@ fun FoodsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
             }
             HorizontalDivider()
         }
-        item { CountryFilesSection(vm) }
+        if (io.github.randomtools3377.fitness.core.Feature.BARCODES in features) item { CountryFilesSection(vm) }
         item {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Your foods", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))

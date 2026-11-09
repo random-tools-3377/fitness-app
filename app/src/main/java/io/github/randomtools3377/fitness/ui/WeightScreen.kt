@@ -73,8 +73,8 @@ fun WeightScreen(vm: MainViewModel, modifier: Modifier) {
                 if (weighIns.size < 2) {
                     Text("The chart appears after two weigh-ins.", style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    WeightChart(weighIns, toShown = { Units.kgToShown(it, units.weight) }, periodDays = if (settings.cycleOn) periodDays else emptySet())
-                    if (settings.cycleOn && periodDays.isNotEmpty()) Legend(LocalChartColors.current.shade, "Period days")
+                    WeightChart(weighIns, toShown = { Units.kgToShown(it, units.weight) }, periodDays = if (on(io.github.randomtools3377.fitness.core.Feature.CYCLE)) periodDays else emptySet())
+                    if (on(io.github.randomtools3377.fitness.core.Feature.CYCLE) && periodDays.isNotEmpty()) Legend(LocalChartColors.current.shade, "Period days")
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Legend(LocalChartColors.current.dots, "Weigh-ins")
                         Legend(LocalChartColors.current.main, "7-day average")

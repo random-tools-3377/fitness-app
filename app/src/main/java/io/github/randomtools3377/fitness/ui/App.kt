@@ -83,6 +83,9 @@ sealed interface Route {
 
     /** The interval timer (0.13.0). */
     data object Intervals : Route
+
+    /** Switching parts of the app on and off (0.15.0). */
+    data object Features : Route
 }
 
 @Composable
@@ -93,6 +96,7 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
     val message by vm.message.collectAsState()
     val workoutMessage by wvm.message.collectAsState()
     val bodyMessage by bvm.message.collectAsState()
+    val features by vm.features.collectAsState()
     val checkIn by bvm.checkIn.collectAsState()
     val offer by vm.targetOffer.collectAsState()
     val units by vm.units.collectAsState()
@@ -145,17 +149,37 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
         snackbar.showSnackbar(m)
     }
 
+    // Only the parts that are on (0.15.0).
+    val progressParts = buildList {
+        if (io.github.randomtools3377.fitness.core.Feature.STATS in features) add("stats")
+        if (io.github.randomtools3377.fitness.core.Feature.WEIGHT in features) add("weight")
+        if (io.github.randomtools3377.fitness.core.Feature.BODY in features || io.github.randomtools3377.fitness.core.Feature.CYCLE in features) add("body")
+        if (io.github.randomtools3377.fitness.core.Feature.HABITS in features || io.github.randomtools3377.fitness.core.Feature.SUPPLEMENTS in features || io.github.randomtools3377.fitness.core.Feature.SLEEP_MOOD in features) add("habits")
+        if (io.github.randomtools3377.fitness.core.Feature.OVERVIEW in features) { add("calendar"); add("year") }
+    }
+    val tabs = Tab.entries.filter { t ->
+        when (t) {
+            Tab.WORKOUTS -> io.github.randomtools3377.fitness.core.Feature.WORKOUTS in features
+            Tab.PLAN -> io.github.randomtools3377.fitness.core.Feature.PLANNING in features || io.github.randomtools3377.fitness.core.Feature.FASTING in features
+            Tab.PROGRESS -> progressParts.isNotEmpty() || io.github.randomtools3377.fitness.core.Feature.CHECK_IN in features
+            else -> true
+        }
+    }
+    LaunchedEffect(tabs) { if (tab !in tabs) tab = Tab.DIARY }
+    LaunchedEffect(progressParts) { if (progressPart !in progressParts && progressParts.isNotEmpty()) progressPart = progressParts.first() }
+
     fun open(r: Route) { stack.add(r) }
     fun back() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
 
     BackHandler(enabled = stack.isNotEmpty()) { back() }
 
+    androidx.compose.runtime.CompositionLocalProvider(LocalFeatures provides features) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             if (stack.isEmpty()) {
                 NavigationBar {
-                    for (t in Tab.entries) {
+                    for (t in tabs) {
                         NavigationBarItem(
                             selected = tab == t,
                             onClick = { tab = t },
@@ -179,12 +203,12 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
                     Tab.WORKOUTS -> WorkoutsScreen(wvm, vm, modifier, open = ::open)
                     Tab.PROGRESS -> Column(modifier) {
                         // The weekly check-in (0.8.0), from Monday until closed.
-                        checkIn?.let { c ->
+                        checkIn?.takeIf { on(io.github.randomtools3377.fitness.core.Feature.CHECK_IN) }?.let { c ->
                             CheckInCard(c, units, onTake = { bvm.takeCheckInTarget(it) }, onClose = { bvm.closeCheckIn() })
                         }
                         Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                             Choices(
-                                listOf("stats", "weight", "body", "habits", "calendar", "year"), progressPart,
+                                progressParts, progressPart,
                                 {
                                     when (it) {
                                         "stats" -> "Stats"; "weight" -> "Weight"; "body" -> "Body"; "habits" -> "Habits"; "calendar" -> "Calendar"; else -> "Year"
@@ -244,7 +268,9 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
             Route.ActiveWorkout -> ActiveWorkoutScreen(wvm, modifier, back = ::back)
             Route.Bests -> BestsScreen(wvm, modifier, back = ::back)
             Route.Intervals -> IntervalScreen(wvm, modifier, back = ::back)
+            Route.Features -> FeaturesScreen(vm, modifier, back = ::back)
         }
+    }
     }
 
     val askEndFast by vm.askEndFast.collectAsState()

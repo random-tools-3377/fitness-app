@@ -236,6 +236,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
+        // The first time 0.15.0 runs: a simple start, plus every part already in use.
+        viewModelScope.launch {
+            val s = repo.settingsOnce()
+            if (s.features == null) {
+                val first = io.github.randomtools3377.fitness.core.Features.firstChoice(s, repo.featureUse())
+                repo.updateSettings { it.copy(features = io.github.randomtools3377.fitness.core.Features.encode(first)) }
+            }
+        }
         // Steps follow the day shown; the home-screen widget follows the day's food and water (0.10.0).
         viewModelScope.launch { day.collect { refreshSteps() } }
         viewModelScope.launch {
@@ -416,6 +424,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val periods: StateFlow<List<io.github.randomtools3377.fitness.core.Period>> = repo.periods.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     fun setCycleOn(on: Boolean) = launchSafely { repo.updateSettings { it.copy(cycleOn = on) } }
+
+    /** The parts of the app that are on (0.15.0). */
+    val features: StateFlow<Set<io.github.randomtools3377.fitness.core.Feature>> =
+        settings.map { io.github.randomtools3377.fitness.core.Features.enabled(it) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.randomtools3377.fitness.core.Features.STARTS_ON)
+
+    fun setFeature(f: io.github.randomtools3377.fitness.core.Feature, isOn: Boolean) = launchSafely {
+        repo.updateSettings { s ->
+            val now = io.github.randomtools3377.fitness.core.Features.enabled(s)
+            val next = if (isOn) now + f else now - f
+            var out = s.copy(features = io.github.randomtools3377.fitness.core.Features.encode(next))
+            // Parts with their own switch follow this one.
+            if (f == io.github.randomtools3377.fitness.core.Feature.CYCLE) out = out.copy(cycleOn = isOn)
+            if (f == io.github.randomtools3377.fitness.core.Feature.STEPS && !isOn) out = out.copy(stepsOn = false)
+            if (f == io.github.randomtools3377.fitness.core.Feature.MEAL_TARGETS && !isOn) out = out.copy(mealSplit = out.mealSplit.copy(enabled = false))
+            out
+        }
+        if (f == io.github.randomtools3377.fitness.core.Feature.STEPS) refreshSteps()
+    }
 
     fun setWorkoutsPerWeek(n: Int) = launchSafely {
         require(n in 1..14) { "Choose between 1 and 14 workouts a week." }

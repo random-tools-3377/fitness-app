@@ -83,6 +83,7 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
     val why by vm.dayTargetWhy.collectAsState()
     // The day's own target (0.11.0): by weekday, on a training day, or in a diet break.
     val target = targetFor(day)
+    val features = LocalFeatures.current
     val dayWorkouts by vm.dayWorkouts.collectAsState()
     var editing by remember { mutableStateOf<DiaryEntry?>(null) }
     var savingMeal by remember { mutableStateOf<Meal?>(null) }
@@ -132,11 +133,11 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
             )
         }
         // Vitamins and minerals from built-in foods (0.11.0).
-        if (totals.total.micros.keys.any { k -> io.github.randomtools3377.fitness.core.Micro.VITAMINS_AND_MINERALS.any { it.key == k } }) {
+        if (io.github.randomtools3377.fitness.core.Feature.VITAMINS in features && totals.total.micros.keys.any { k -> io.github.randomtools3377.fitness.core.Micro.VITAMINS_AND_MINERALS.any { it.key == k } }) {
             item(key = "micros") { MicrosCard(totals.total) }
         }
 
-        if (dayWorkouts.isNotEmpty()) {
+        if (dayWorkouts.isNotEmpty() && io.github.randomtools3377.fitness.core.Feature.WORKOUTS in features) {
             item {
                 Section("Workouts") {
                     for (w in dayWorkouts) {
@@ -149,7 +150,7 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
             }
         }
 
-        item {
+        if (io.github.randomtools3377.fitness.core.Feature.WATER in features) item {
             val ml = Water.total(water, day)
             val w = settings.water
             Section("Water") {
@@ -193,11 +194,11 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
             }
         }
         // Habits and sleep and mood for the day shown (0.8.0).
-        item(key = "habits") { HabitsCard(bvm, day) }
-        item(key = "supplements") {
+        if (io.github.randomtools3377.fitness.core.Feature.HABITS in features) item(key = "habits") { HabitsCard(bvm, day) }
+        if (io.github.randomtools3377.fitness.core.Feature.SUPPLEMENTS in features) item(key = "supplements") {
             HabitsCard(bvm, day, io.github.randomtools3377.fitness.core.HabitKind.SUPPLEMENT, "Supplements and medication")
         }
-        item(key = "sleep") { SleepMoodCard(bvm, day) }
+        if (io.github.randomtools3377.fitness.core.Feature.SLEEP_MOOD in features) item(key = "sleep") { SleepMoodCard(bvm, day) }
         item { Spacer(Modifier.height(24.dp)) }
     }
 
@@ -272,13 +273,15 @@ private fun SummaryCard(
         MacroRow("Carbs", eaten.carbs, if (targetKcal != null) macroTargets.carbs else null)
         MacroRow("Fat", eaten.fat, if (targetKcal != null) macroTargets.fat else null)
         // Fibre, sugar, saturates and salt (0.7.0): shown when a food gave them or a target is set.
-        ExtraRow("Fibre", eaten.fibre, extraTargets.fibre, atLeast = true)
-        ExtraRow("Sugar", eaten.sugar, extraTargets.sugar, atLeast = false)
-        ExtraRow("Saturates", eaten.satFat, extraTargets.satFat, atLeast = false)
-        ExtraRow("Salt", eaten.salt, extraTargets.salt, atLeast = false)
+        if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS)) {
+            ExtraRow("Fibre", eaten.fibre, extraTargets.fibre, atLeast = true)
+            ExtraRow("Sugar", eaten.sugar, extraTargets.sugar, atLeast = false)
+            ExtraRow("Saturates", eaten.satFat, extraTargets.satFat, atLeast = false)
+            ExtraRow("Salt", eaten.salt, extraTargets.salt, atLeast = false)
+        }
         // Alcohol and caffeine (0.11.0).
         val alcohol = eaten.micro(io.github.randomtools3377.fitness.core.Micro.ALCOHOL)
-        if (alcohol != null && alcohol > 0 || extraTargets.alcoholDrinks != null) {
+        if (on(io.github.randomtools3377.fitness.core.Feature.ALCOHOL_CAFFEINE) && (alcohol != null && alcohol > 0 || extraTargets.alcoholDrinks != null)) {
             val drinks = io.github.randomtools3377.fitness.core.Micros.drinks(alcohol ?: 0.0, drinkGrams)
             val limit = extraTargets.alcoholDrinks
             LabelValue(
@@ -289,7 +292,7 @@ private fun SummaryCard(
             if (limit != null && drinks > limit) Text("Over the day's limit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
         val caffeine = eaten.micro(io.github.randomtools3377.fitness.core.Micro.CAFFEINE)
-        if (caffeine != null && caffeine > 0 || extraTargets.caffeineMg != null) {
+        if (on(io.github.randomtools3377.fitness.core.Feature.ALCOHOL_CAFFEINE) && (caffeine != null && caffeine > 0 || extraTargets.caffeineMg != null)) {
             val mg = (caffeine ?: 0.0).roundToInt()
             val limit = extraTargets.caffeineMg
             LabelValue("Caffeine", "$mg mg" + (limit?.let { " of at most ${it.roundToInt()} mg" } ?: ""), tag = "day-caffeine")
@@ -411,7 +414,7 @@ private fun MealCard(
                 }
             }
         }
-        for (e in entries.filter { it.planned }) {
+        for (e in entries.filter { it.planned && on(io.github.randomtools3377.fitness.core.Feature.PLANNING) }) {
             // Planned ahead: doesn't count until ticked as eaten.
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("planned:${e.name}"), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -438,7 +441,7 @@ private fun MealCard(
         }
         if (entries.any { !it.planned }) {
             Text(macroLine(total), style = MaterialTheme.typography.bodySmall)
-            extrasLine(total).takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS)) extrasLine(total).takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         } else {
             TextButton(onClick = sameAsYesterday, modifier = Modifier.testTag("same-as-yesterday:${meal.name}")) { Text("Same as yesterday") }
         }

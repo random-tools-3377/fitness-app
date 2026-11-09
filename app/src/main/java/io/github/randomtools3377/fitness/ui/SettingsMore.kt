@@ -1,5 +1,6 @@
 package io.github.randomtools3377.fitness.ui
 
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -115,11 +118,11 @@ fun RemindersSection(vm: MainViewModel, settings: AppSettings) {
                 )
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        if (on(io.github.randomtools3377.fitness.core.Feature.WATER)) Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Water", Modifier.weight(1f))
             Switch(checked = r.waterOn, onCheckedChange = { save(r.copy(waterOn = it)) }, modifier = Modifier.testTag("remind:WATER"))
         }
-        if (r.waterOn) {
+        if (r.waterOn && on(io.github.randomtools3377.fitness.core.Feature.WATER)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Every")
                 Choices(listOf(1, 2, 3, 4), r.waterEveryHours, { "$it h" }, { "water-every:$it" }) { save(r.copy(waterEveryHours = it)) }
@@ -131,8 +134,8 @@ fun RemindersSection(vm: MainViewModel, settings: AppSettings) {
                 TimeBox(r.waterTo, "water-to") { save(r.copy(waterTo = it)) }
             }
         }
-        DaysReminder("Workouts", r.workout, 18 * 60, setOf(1, 3, 5), "WORKOUT") { save(r.copy(workout = it)) }
-        DaysReminder("Weigh-ins", r.weighIn, 7 * 60, setOf(1), "WEIGH_IN") { save(r.copy(weighIn = it)) }
+        if (on(io.github.randomtools3377.fitness.core.Feature.WORKOUTS)) DaysReminder("Workouts", r.workout, 18 * 60, setOf(1, 3, 5), "WORKOUT") { save(r.copy(workout = it)) }
+        if (on(io.github.randomtools3377.fitness.core.Feature.WEIGHT)) DaysReminder("Weigh-ins", r.weighIn, 7 * 60, setOf(1), "WEIGH_IN") { save(r.copy(weighIn = it)) }
     }
 }
 
@@ -171,17 +174,6 @@ fun PrivacySection(vm: MainViewModel, settings: AppSettings) {
                 )
                 Text(tab.title)
             }
-        }
-        // Cycle tracking (0.12.0) lives with privacy: it's off until turned on.
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Cycle tracking")
-                Text(
-                    "Log periods under Progress → Body; the weight chart marks them. Kept on this phone, behind the lock when Progress is locked.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Switch(checked = settings.cycleOn, onCheckedChange = { vm.setCycleOn(it) }, modifier = Modifier.testTag("cycle-on"))
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Text("The app is hidden in the recent-apps screen.", style = MaterialTheme.typography.bodySmall)
@@ -292,24 +284,28 @@ fun ExtraTargetsSection(vm: MainViewModel, settings: AppSettings) {
     var caffeine by remember(t) { mutableStateOf(text(t.caffeineMg)) }
     val regionDrink = io.github.randomtools3377.fitness.core.standardDrinkGrams(java.util.Locale.getDefault().country)
     var drinkGrams by remember(settings.drinkGrams) { mutableStateOf(text(settings.drinkGrams ?: regionDrink)) }
-    Section("Fibre, sugar, saturates, salt, alcohol and caffeine") {
+    Section("Daily limits") {
         Text(
             "Shown on the day when a food gives them. Daily targets are optional: leave a box empty for none.",
             style = MaterialTheme.typography.bodySmall,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField(fibre, { fibre = it }, "Fibre, at least", "target:fibre", Modifier.weight(1f), suffix = "g")
-            NumberField(sugar, { sugar = it }, "Sugar, at most", "target:sugar", Modifier.weight(1f), suffix = "g")
+        if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(fibre, { fibre = it }, "Fibre, at least", "target:fibre", Modifier.weight(1f), suffix = "g")
+                NumberField(sugar, { sugar = it }, "Sugar, at most", "target:sugar", Modifier.weight(1f), suffix = "g")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(satFat, { satFat = it }, "Saturates, at most", "target:satfat", Modifier.weight(1f), suffix = "g")
+                NumberField(salt, { salt = it }, "Salt, at most", "target:salt", Modifier.weight(1f), suffix = "g")
+            }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField(satFat, { satFat = it }, "Saturates, at most", "target:satfat", Modifier.weight(1f), suffix = "g")
-            NumberField(salt, { salt = it }, "Salt, at most", "target:salt", Modifier.weight(1f), suffix = "g")
+        if (on(io.github.randomtools3377.fitness.core.Feature.ALCOHOL_CAFFEINE)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(drinks, { drinks = it }, "Drinks, at most", "target:drinks", Modifier.weight(1f))
+                NumberField(caffeine, { caffeine = it }, "Caffeine, at most", "target:caffeine", Modifier.weight(1f), suffix = "mg")
+            }
+            NumberField(drinkGrams, { drinkGrams = it }, "A standard drink", "field:drink-grams", Modifier.fillMaxWidth(), suffix = "g of alcohol")
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField(drinks, { drinks = it }, "Drinks, at most", "target:drinks", Modifier.weight(1f))
-            NumberField(caffeine, { caffeine = it }, "Caffeine, at most", "target:caffeine", Modifier.weight(1f), suffix = "mg")
-        }
-        NumberField(drinkGrams, { drinkGrams = it }, "A standard drink", "field:drink-grams", Modifier.fillMaxWidth(), suffix = "g of alcohol")
         OutlinedButton(
             onClick = {
                 fun parse(s: String) = io.github.randomtools3377.fitness.core.Units.parse(s)
@@ -454,5 +450,48 @@ fun DayTargetsSection(vm: MainViewModel, settings: AppSettings) {
                 OutlinedButton(onClick = { vm.startDietBreak(2) }, modifier = Modifier.testTag("diet-break:2")) { Text("2 weeks") }
             }
         }
+    }
+}
+
+/** Settings → Features (0.15.0): a switch for each part of the app, and suggestions for the ones that are off. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun FeaturesScreen(vm: MainViewModel, modifier: Modifier, back: () -> Unit) {
+    val features by vm.features.collectAsState()
+    Column(modifier.fillMaxSize()) {
+        androidx.compose.material3.TopAppBar(
+            title = { Text("Features") },
+            navigationIcon = {
+                androidx.compose.material3.IconButton(onClick = back, modifier = Modifier.testTag("back")) {
+                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+        )
+        androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize().testTag("features-list")) {
+            item {
+                Text(
+                    "The food diary is always here. Switch on only what you use; switching a part off hides it everywhere and deletes nothing.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+            val inUse = io.github.randomtools3377.fitness.core.Feature.entries.filter { it in features }
+            val suggestions = io.github.randomtools3377.fitness.core.Feature.entries.filter { it !in features }
+            if (inUse.isNotEmpty()) item { Text("On", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 8.dp)) }
+            for (f in inUse) item(key = "on:${f.name}") { FeatureRow(f, true) { vm.setFeature(f, it) } }
+            if (suggestions.isNotEmpty()) item { Text("You might like", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 16.dp)) }
+            for (f in suggestions) item(key = "off:${f.name}") { FeatureRow(f, false) { vm.setFeature(f, it) } }
+        }
+    }
+}
+
+@Composable
+private fun FeatureRow(f: io.github.randomtools3377.fitness.core.Feature, isOn: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(f.title)
+            Text(f.description, style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = isOn, onCheckedChange = onChange, modifier = Modifier.testTag("feature:${f.name}"))
     }
 }

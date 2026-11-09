@@ -131,7 +131,7 @@ fun AddFoodScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("search"),
         )
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = scan, modifier = Modifier.testTag("scan")) { Text("Scan") }
+            if (on(io.github.randomtools3377.fitness.core.Feature.BARCODES)) OutlinedButton(onClick = scan, modifier = Modifier.testTag("scan")) { Text("Scan") }
             OutlinedButton(onClick = { newFood(null) }, modifier = Modifier.testTag("new-food")) { Text("From a label") }
             if (mode != AddMode.RECIPE) OutlinedButton(onClick = { quick = true }, modifier = Modifier.testTag("quick-add")) { Text("Quick add") }
         }
