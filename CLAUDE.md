@@ -329,6 +329,26 @@ day, diet breaks); 0.12.0 body (body-fat estimate, supplements and medication, c
 0.13.0 workouts (interval timer, one-rep-max table, exercise notes); 0.14.0 overview (calendar,
 year in review, larger text and colour-blind-friendly charts).
 
+## Keeping it simple
+
+Decided on 2026-11-09: the app must not feel cluttered. Only what the user uses shows; every
+other part can be hidden.
+
+- A **Features** page in Settings with a switch for each part. A part that is off has no tab,
+  button, diary card or setting anywhere, and nothing logged in it is deleted; turning it back on
+  shows it all again. The food diary (calories, protein, carbs and fat) and Settings always stay.
+- A new install starts simple, and the Features page suggests the rest under "You might like",
+  each with a one-line description.
+- **Details (default):** a new install starts with the food diary, saved meals and copying,
+  water, weight, workouts, and stats and streaks. Everything else starts off: barcodes and country
+  files; reading labels with the camera; recipes, planning ahead and the shopping list; fasting;
+  a target for each meal; targets by day and diet breaks; fibre, sugar, saturates and salt;
+  alcohol and caffeine; vitamins and minerals; measurements, the body-fat estimate and photos;
+  sleep and mood; habits; supplements and medication; cycle tracking; steps; the weekly check-in;
+  training extras (the programme, plate calculator, hints, supersets and warm-ups, interval timer
+  and exercise notes); and the calendar and year in review. On an update, a part the user has
+  already used (has data or settings in) stays on.
+
 ## Talking to the owner
 
 - Short and plain. The owner is not an Android developer. Say what changed, what to try, and what
