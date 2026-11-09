@@ -25,6 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Can the CIQUAL site be reached?
+        run: |
+          curl -sS -I -m 60 https://ciqual.anses.fr/ | head -n 20 || true
+          curl -sS -I -m 60 https://ciqual.anses.fr/cms/sites/default/files/inline-files/XML_2020_07_07.zip | head -n 20 || true
+
       - name: Build foods.tsv from USDA FoodData Central and CIQUAL
         run: python3 tools/build-food-list.py --work "$RUNNER_TEMP/food-data" --out app/src/main/assets
 

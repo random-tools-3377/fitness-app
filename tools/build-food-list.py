@@ -304,31 +304,49 @@ def build_usda(args, work):
 # ---- CIQUAL ----
 
 
-def ciqual_url(given, work):
-    """The newest CIQUAL XML zip: given, already downloaded, from data.gouv.fr, or a known one."""
-    if given:
+CIQUAL_SEARCH_API = "https://www.data.gouv.fr/api/1/datasets/?q=ciqual&page_size=20"
+
+
+def ciqual_candidates():
+    """Every CIQUAL XML zip listed on data.gouv.fr, newest first, then the known addresses."""
+    found = []
+    for api in (CIQUAL_DATASET_API, CIQUAL_SEARCH_API):
+        try:
+            info = json.loads(fetch(api, tries=2).decode("utf-8"))
+        except Exception as e:
+            print("Could not read", api, ":", e)
+            continue
+        datasets = info.get("data", [info])
+        for d in datasets:
+            for r in d.get("resources", []):
+                url = r.get("url") or ""
+                title = r.get("title") or ""
+                fmt = (r.get("format") or "").lower()
+                print("  CIQUAL resource: %s | %s | %s | %s | %s" % (d.get("title"), title, fmt, r.get("last_modified"), url))
+                text = (title + " " + url + " " + fmt).lower()
+                if "xml" in text and url.lower().endswith(".zip"):
+                    found.append((r.get("last_modified") or "", url))
+    urls = [u for _, u in sorted(set(found), reverse=True)]
+    for u in CIQUAL_KNOWN:
+        if u not in urls:
+            urls.append(u)
+    return urls
+
+
+def ciqual_file(given, work):
+    """The newest CIQUAL XML zip that can be had: given, already downloaded, or downloaded now."""
+    if given and not given.startswith("http"):
         return given
     local = sorted(n for n in os.listdir(work) if n.lower().startswith("ciqual") and n.lower().endswith(".zip"))
     if local:
         return os.path.join(work, local[-1])
-    try:
-        info = json.loads(fetch(CIQUAL_DATASET_API).decode("utf-8"))
-        candidates = []
-        for r in info.get("resources", []):
-            url = r.get("url") or ""
-            title = r.get("title") or ""
-            fmt = (r.get("format") or "").lower()
-            print("  CIQUAL resource: %s | %s | %s | %s" % (title, fmt, r.get("last_modified"), url))
-            if "xml" in (title + " " + url + " " + fmt).lower() and url.lower().endswith(".zip"):
-                candidates.append((r.get("last_modified") or "", url))
-        if candidates:
-            return sorted(candidates)[-1][1]
-    except Exception as e:
-        print("Could not read the data.gouv.fr catalogue:", e)
-    for url in CIQUAL_KNOWN:
-        if exists(url):
-            return url
-    sys.exit("No CIQUAL file found. Give its address with --ciqual.")
+    urls = [given] if given else ciqual_candidates()
+    for url in urls:
+        try:
+            return download(url, os.path.join(work, "ciqual-" + os.path.basename(url)))
+        except Exception as e:
+            print("  Could not download", url, ":", e)
+    sys.exit("No CIQUAL file could be downloaded. Give its address or path with --ciqual.")
 
 
 def parse_xml(raw):
@@ -368,11 +386,7 @@ def find_const(consts, *patterns):
 
 
 def build_ciqual(args, work):
-    source = ciqual_url(args.ciqual, work)
-    if source.startswith("http"):
-        path = download(source, os.path.join(work, "ciqual-" + os.path.basename(source)))
-    else:
-        path = source
+    path = ciqual_file(args.ciqual, work)
     with zipfile.ZipFile(path) as z:
         members = z.namelist()
         print("CIQUAL files:", members)
