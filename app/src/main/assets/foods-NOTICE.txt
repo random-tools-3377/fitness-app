@@ -1,11 +1,16 @@
-The built-in food list (foods.tsv) comes from USDA FoodData Central, the food data of the
-U.S. Department of Agriculture, Agricultural Research Service (https://fdc.nal.usda.gov).
-FoodData Central is in the public domain (CC0 1.0). The datasets used are:
+The built-in food list (foods.tsv) comes from government food tables.
 
-  - Foundation Foods: FoodData_Central_foundation_food_json_2026-10-29.zip (373 foods)
-  - SR Legacy: FoodData_Central_sr_legacy_food_json_2018-04.zip (7703 foods)
-  - FNDDS (Survey Foods): FoodData_Central_survey_food_json_2024-10-31.zip (5326 foods)
+USDA FoodData Central
+  U.S. Department of Agriculture, Agricultural Research Service. FoodData Central.
+  https://fdc.nal.usda.gov. In the public domain (CC0 1.0). This app is not endorsed by the USDA.
 
-U.S. Department of Agriculture, Agricultural Research Service. FoodData Central.
-Nutrients are per 100 g as published. Where a name appears in more than one dataset, only the
-first is kept, in the order above. This app is not endorsed by the USDA.
+The files used:
+
+  - USDA Foundation Foods: FoodData_Central_foundation_food_json_2026-10-29.zip (373 foods)
+  - USDA SR Legacy: FoodData_Central_sr_legacy_food_json_2018-04.zip (7703 foods)
+  - USDA FNDDS (Survey Foods): FoodData_Central_survey_food_json_2024-10-31.zip (5326 foods)
+
+Changes made: nutrients are per 100 g, rounded to one decimal. Carbs are given without fibre, as
+on EU labels: where USDA gives carbohydrate including fibre, the fibre was taken off. A value
+given as traces, as below a limit, or left out is shown as 0. Within USDA, where a name appears
+in more than one dataset, only the first is kept, in the order above.

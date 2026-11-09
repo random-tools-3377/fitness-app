@@ -56,5 +56,5 @@ jobs:
           git checkout -B food-data
           git add app/src/main/assets/foods.tsv app/src/main/assets/foods-NOTICE.txt
           if git diff --cached --quiet; then echo "The food list is unchanged."; exit 0; fi
-          git commit -m "Built-in food list from USDA FoodData Central and CIQUAL" -m "Made by tools/build-food-list.py in the Food list workflow."
+          git commit -m "Built-in food list: $(sed -n 1p app/src/main/assets/foods.tsv | sed "s/^# Built-in foods, //")" -m "Made by tools/build-food-list.py in the Food list workflow."
           git push --force origin food-data
