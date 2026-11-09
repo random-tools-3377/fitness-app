@@ -286,6 +286,49 @@ reading a label); 0.8.0 body and habits (measurements, photos, sleep and mood, w
 own habits); 0.9.0 workouts (programmes, plate calculator, hints, supersets and warm-ups); 0.10.0
 the widget, steps, theme and spreadsheet export.
 
+## More, after 0.10.0
+
+Decided on 2026-11-09: everything below is added.
+
+- **Alcohol and caffeine:** counted from foods and drinks, in grams of alcohol (shown as
+  standard drinks) and mg of caffeine, with optional daily limits **(default: from the built-in
+  food data and typed-in labels; a standard drink is 10 g of alcohol, changeable (14 g in the US,
+  8 g as a UK unit); limits off until set)**.
+- **Vitamins and minerals:** for built-in foods, from the government tables **(default: iron,
+  calcium, vitamin D, vitamin C, potassium, magnesium, vitamin B12, folate, zinc and vitamin A,
+  shown as a share of the EU label reference values, which are labelled as such and not as
+  personal needs; typed-in foods and country files don't have them)**.
+- **Different targets by day:** a calorie target for each weekday, or extra calories on training
+  days **(default: both off; a training day is one with a finished workout, or a programme day;
+  protein, carbs and fat follow the percentages)**.
+- **Diet breaks:** a planned week or two at maintenance calories, then back to the plan **(default:
+  maintenance is the worked-out target for keeping the current weight; 1 or 2 weeks)**.
+- **Body-fat estimate:** from waist, neck and height (and hips for women), by the US Navy
+  formula, always marked as an estimate.
+- **Supplements and medication:** a daily tick list with optional reminders at set times. The app
+  gives no medical advice about them **(default: on the diary next to the habits; in the backup
+  file)**.
+- **Cycle tracking:** period start and end days, kept on the phone and behind the lock with
+  Progress; the weight chart marks period days, because weight often rises around them
+  **(default: off until turned on in Settings; the next period's date is shown as an estimate
+  from the average cycle; no fertility predictions and no medical advice)**.
+- **Interval timer:** work and rest rounds (HIIT, Tabata) with a buzz at each change **(default:
+  presets 20/10 × 8 and 40/20 × 10, or the user's own; the screen stays on while it runs)**.
+- **One-rep-max table:** the weights for 1 to 12 reps from the estimated one-rep max, on each
+  exercise's personal bests **(default: the same Epley formula as the bests)**.
+- **Exercise notes:** the user's own cues per exercise ("elbows in"), shown during the workout.
+- **Calendar view:** a month grid, each day coloured by the calorie target and marked with
+  workouts **(default: on Progress)**.
+- **Year in review:** the year's totals and bests **(default: on Progress, for this year and past
+  years)**.
+- **Larger text and colour-blind-friendly charts:** a text size setting, and chart colours that
+  don't rely on red and green **(default: Okabe–Ito colours when turned on)**.
+
+Build order **(default)**: 0.11.0 food (alcohol and caffeine, vitamins and minerals, targets by
+day, diet breaks); 0.12.0 body (body-fat estimate, supplements and medication, cycle tracking);
+0.13.0 workouts (interval timer, one-rep-max table, exercise notes); 0.14.0 overview (calendar,
+year in review, larger text and colour-blind-friendly charts).
+
 ## Talking to the owner
 
 - Short and plain. The owner is not an Android developer. Say what changed, what to try, and what
