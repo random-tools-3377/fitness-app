@@ -1,0 +1,30 @@
+name: AI check
+
+# Tries the optional on-phone AI models for real, on a Linux machine: builds llama.cpp and the
+# app's own AI code from tools/ai-check, downloads the models, and runs sample meals, recipes,
+# summaries, speech and plate photos through them. Started from the Actions tab on any branch.
+# Read-only, uses no secrets, publishes nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "What to run (see tools/ai-check/run.sh)"
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Try the AI models
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run the check
+        env:
+          STEP: ${{ inputs.step }}
+        run: bash tools/ai-check/run.sh "$STEP"
