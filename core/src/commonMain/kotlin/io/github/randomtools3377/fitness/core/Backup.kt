@@ -37,6 +37,10 @@ data class AppSettings(
     val programme: Map<Int, Long> = emptyMap(),
     /** The bar and plates for the plate calculator (0.9.0). */
     val plates: PlateSettings = PlateSettings(),
+    /** Light or dark, and the accent colour (0.10.0). */
+    val theme: ThemeSettings = ThemeSettings(),
+    /** Whether steps from Health Connect are read and counted (0.10.0). */
+    val stepsOn: Boolean = false,
     /** The Monday whose weekly check-in the user has seen and closed (0.8.0). */
     val checkInSeen: kotlinx.datetime.LocalDate? = null,
 ) {
