@@ -58,7 +58,7 @@ object Bests {
 
     /** Every best a single set reaches, before comparing with the history. */
     fun of(e: Exercise, s: WorkoutSet, day: LocalDate): List<Best> {
-        if (!s.done) return emptyList()
+        if (!s.done || s.warmUp) return emptyList()
         val out = mutableListOf<Best>()
         when (e.kind) {
             ExerciseKind.WEIGHTS -> {

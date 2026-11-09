@@ -33,6 +33,10 @@ data class AppSettings(
     val favourites: Set<String> = emptySet(),
     /** Daily targets for fibre, sugar, saturated fat and salt; off until set (0.7.0). */
     val extraTargets: ExtraTargets = ExtraTargets(),
+    /** The weekly programme: a saved workout's id for each day it's on, 1 = Monday (0.9.0). */
+    val programme: Map<Int, Long> = emptyMap(),
+    /** The bar and plates for the plate calculator (0.9.0). */
+    val plates: PlateSettings = PlateSettings(),
     /** The Monday whose weekly check-in the user has seen and closed (0.8.0). */
     val checkInSeen: kotlinx.datetime.LocalDate? = null,
 ) {

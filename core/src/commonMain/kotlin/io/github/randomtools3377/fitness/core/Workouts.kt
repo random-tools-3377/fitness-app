@@ -179,6 +179,8 @@ data class WorkoutSet(
     val done: Boolean = false,
     /** Epoch milliseconds when it was ticked. */
     val doneAt: Long? = null,
+    /** A warm-up set (0.9.0): in neither personal bests nor the total lifted. */
+    val warmUp: Boolean = false,
 )
 
 /** An exercise as done in one workout: its sets in order. */
@@ -186,6 +188,8 @@ data class WorkoutSet(
 data class WorkoutExercise(
     val exercise: Exercise,
     val sets: List<WorkoutSet>,
+    /** Exercises with the same number are a superset, done in turn (0.9.0). */
+    val superset: Int? = null,
 )
 
 /**
@@ -219,7 +223,7 @@ data class SavedWorkout(
 )
 
 @Serializable
-data class SavedWorkoutItem(val exercise: Exercise, val sets: Int)
+data class SavedWorkoutItem(val exercise: Exercise, val sets: Int, val superset: Int? = null)
 
 object Workouts {
     /**
@@ -237,7 +241,7 @@ object Workouts {
                 val from = last?.getOrNull(i) ?: last?.lastOrNull()
                 from?.copy(done = false, doneAt = null) ?: WorkoutSet()
             }
-            WorkoutExercise(item.exercise, sets)
+            WorkoutExercise(item.exercise, sets, item.superset)
         },
     )
 
@@ -259,7 +263,7 @@ object Workouts {
         require(w.exercises.isNotEmpty()) { "There are no exercises to save." }
         return SavedWorkout(
             name = name.trim(),
-            items = w.exercises.map { SavedWorkoutItem(it.exercise, it.sets.size.coerceAtLeast(1)) },
+            items = w.exercises.map { SavedWorkoutItem(it.exercise, it.sets.size.coerceAtLeast(1), it.superset) },
             createdAt = now,
         )
     }

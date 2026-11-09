@@ -67,7 +67,7 @@ object Stats {
     /** Sets × reps × weight of ticked weights sets. */
     fun lifted(we: WorkoutExercise): Double =
         if (we.exercise.kind != ExerciseKind.WEIGHTS) 0.0
-        else we.sets.filter { it.done }.sumOf { (it.weightKg ?: 0.0) * (it.reps ?: 0) }
+        else we.sets.filter { it.done && !it.warmUp }.sumOf { (it.weightKg ?: 0.0) * (it.reps ?: 0) }
 
     /** Workouts and the total lifted for each of the last [weeks] weeks, oldest first. */
     fun trainingWeeks(workouts: List<Workout>, weeks: Int, today: LocalDate): List<TrainingWeek> {
