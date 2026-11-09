@@ -22,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -91,6 +92,19 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
         MacroSection(settings.macros, settings.targetKcal ?: 2000, onSave = vm::setMacros)
         WaterSection(settings.water, units.volume, onSave = vm::setWater)
 
+        Section("Workouts") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Count only half of the calories burned")
+                    Text(
+                        "Calories burned are estimates from standard activity values and your weight, and tend to run high.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(checked = settings.burnedHalf, onCheckedChange = { vm.setBurnedHalf(it) }, modifier = Modifier.testTag("burned-half"))
+            }
+        }
+
         Section("Units") {
             Text(
                 if (settings.units == null) "Following the phone's region." else "Chosen here.",
@@ -132,6 +146,11 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
                     "The sources don't endorse this app.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.testTag("credits"),
+            )
+            Text(
+                "Calories burned are estimated from standard activity values (METs) in the Compendium of Physical Activities, " +
+                    "times your weight and the time spent.",
+                style = MaterialTheme.typography.bodySmall,
             )
             Text(
                 "The calorie target is an estimate (the Mifflin–St Jeor formula). It is not medical advice.",

@@ -6,6 +6,11 @@ import io.github.randomtools3377.fitness.core.AppSettings
 import io.github.randomtools3377.fitness.core.Backup
 import io.github.randomtools3377.fitness.core.BuiltInFoods
 import io.github.randomtools3377.fitness.core.DiaryEntry
+import io.github.randomtools3377.fitness.core.Exercise
+import io.github.randomtools3377.fitness.core.ExerciseKind
+import io.github.randomtools3377.fitness.core.Exercises
+import io.github.randomtools3377.fitness.core.SavedWorkout
+import io.github.randomtools3377.fitness.core.Workout
 import io.github.randomtools3377.fitness.core.Food
 import io.github.randomtools3377.fitness.core.SavedMeal
 import io.github.randomtools3377.fitness.core.Usage
@@ -108,6 +113,46 @@ class Repository(private val context: Context, val db: AppDatabase) {
     suspend fun addWeighIn(w: WeighIn) = dao.insertWeighIns(listOf(w.toRow()))
     suspend fun deleteWeighIn(id: Long) = dao.deleteWeighIn(id)
 
+    // Workouts.
+    val workouts: Flow<List<Workout>> = combine(dao.workouts(), dao.workoutSets()) { w, s -> workoutsOf(w, s) }
+    suspend fun workoutsOnce(): List<Workout> = workoutsOf(dao.allWorkouts(), dao.allWorkoutSets())
+
+    /** Saves a workout as it is now, sets and all, and gives back its id. */
+    suspend fun saveWorkout(w: Workout): Long = db.withTransaction {
+        val id = if (w.id == 0L) dao.insertWorkout(w.toRow()) else { dao.updateWorkout(w.toRow()); w.id }
+        dao.deleteSetsOf(id)
+        dao.insertWorkoutSets(w.setRows(id))
+        id
+    }
+
+    suspend fun deleteWorkout(id: Long) = dao.deleteWorkout(id)
+
+    val savedWorkouts: Flow<List<SavedWorkout>> =
+        combine(dao.savedWorkouts(), dao.savedWorkoutItems()) { r, i -> savedWorkoutsOf(r, i) }
+
+    suspend fun saveSavedWorkout(sw: SavedWorkout): Long = db.withTransaction {
+        val id = dao.insertSavedWorkout(SavedWorkoutRow(name = sw.name, createdAt = sw.createdAt))
+        dao.insertSavedWorkoutItems(sw.itemRows(id))
+        id
+    }
+
+    suspend fun deleteSavedWorkout(id: Long) = dao.deleteSavedWorkout(id)
+
+    /** The user's own exercises (not deleted). */
+    val ownExercises: Flow<List<Exercise>> = dao.exercises().map { rows -> rows.filter { !it.hidden }.map { it.toCore() } }
+
+    suspend fun addExercise(name: String, kind: ExerciseKind): Exercise {
+        val id = dao.insertExercise(ExerciseRow(name = name.trim(), kind = kind.name))
+        return Exercises.own(id, name, kind)
+    }
+
+    suspend fun deleteExercise(e: Exercise) {
+        e.key.removePrefix("u:").toLongOrNull()?.let { dao.hideExercise(it) }
+    }
+
+    val restTimes: Flow<Map<String, Int>> = dao.restTimes().map { rows -> rows.associate { it.exerciseKey to it.seconds } }
+    suspend fun setRest(key: String, seconds: Int) = dao.putRest(RestRow(key, seconds))
+
     // Settings, kept as one JSON value in the same form as the backup file.
     val settings: Flow<AppSettings> = dao.setting(SETTINGS_KEY).map { AppSettings.decode(it) }
     suspend fun settingsOnce(): AppSettings = AppSettings.decode(dao.settingOnce(SETTINGS_KEY))
@@ -130,6 +175,10 @@ class Repository(private val context: Context, val db: AppDatabase) {
                 water = dao.allWater().map { it.toCore() },
                 weighIns = dao.allWeighIns().map { it.toCore() },
                 settings = settingsOnce(),
+                exercises = dao.allExercises().filter { !it.hidden }.map { it.toCore() },
+                workouts = workoutsOf(dao.allWorkouts(), dao.allWorkoutSets()),
+                savedWorkouts = savedWorkoutsOf(dao.allSavedWorkouts(), dao.allSavedWorkoutItems()),
+                restSeconds = dao.allRestTimes().associate { it.exerciseKey to it.seconds },
             )
         }
         return Backup.encode(backup)
@@ -148,6 +197,12 @@ class Repository(private val context: Context, val db: AppDatabase) {
             dao.clearWater()
             dao.clearWeighIns()
             dao.clearSettings()
+            dao.clearWorkoutSets()
+            dao.clearWorkouts()
+            dao.clearSavedWorkoutItems()
+            dao.clearSavedWorkouts()
+            dao.clearExercises()
+            dao.clearRestTimes()
             dao.insertFoods(backup.foods.map { it.toRow(now) })
             dao.insertEntries(backup.entries.map { it.toRow() })
             for (meal in backup.savedMeals) {
@@ -157,6 +212,21 @@ class Repository(private val context: Context, val db: AppDatabase) {
             dao.insertWater(backup.water.map { it.toRow() })
             dao.insertWeighIns(backup.weighIns.map { it.toRow() })
             dao.putSetting(SettingRow(SETTINGS_KEY, AppSettings.encode(backup.settings)))
+            // The user's own exercises keep their ids, so workouts still point to them.
+            dao.insertExercises(
+                backup.exercises.mapNotNull { e ->
+                    e.key.removePrefix("u:").toLongOrNull()?.let { ExerciseRow(id = it, name = e.name, kind = e.kind.name) }
+                },
+            )
+            for (w in backup.workouts) {
+                val id = dao.insertWorkout(w.toRow())
+                dao.insertWorkoutSets(w.setRows(id))
+            }
+            for (sw in backup.savedWorkouts) {
+                val id = dao.insertSavedWorkout(SavedWorkoutRow(id = sw.id, name = sw.name, createdAt = sw.createdAt))
+                dao.insertSavedWorkoutItems(sw.itemRows(id))
+            }
+            for ((key, sec) in backup.restSeconds) dao.putRest(RestRow(key, sec))
         }
     }
 

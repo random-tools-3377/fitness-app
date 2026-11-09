@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A stopwatch, for the rest timer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,6 a7,7 0 1,1 0,14 a7,7 0 1,1 0,-14 M12,13 L12,9.5 M10,3 L14,3 M12,3 L12,6"
+        android:strokeLineCap="round"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFFF" />
+</vector>

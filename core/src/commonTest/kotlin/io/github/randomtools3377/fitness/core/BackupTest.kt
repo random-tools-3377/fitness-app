@@ -1,6 +1,10 @@
 package io.github.randomtools3377.fitness.core
 
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -43,8 +47,35 @@ class BackupTest {
         assertEquals("This file isn't a Fitness App backup, or it is damaged.", assertFailsWith<BackupError> { Backup.decode("hello") }.message)
         val other = Backup.encode(sample()).replace("\"app\": \"fitness\"", "\"app\": \"checklist\"")
         assertEquals("This file isn't a Fitness App backup.", assertFailsWith<BackupError> { Backup.decode(other) }.message)
-        val newer = Backup.encode(sample()).replace("\"format\": 1", "\"format\": 99")
+        val newer = Backup.encode(sample()).replace("\"format\": ${Backup.FORMAT}", "\"format\": 99")
         assertTrue(assertFailsWith<BackupError> { Backup.decode(newer) }.message!!.contains("newer version"))
+    }
+
+    @Test
+    fun aFileFromVersion0_1WithoutWorkoutsStillReads() {
+        val json = Json.parseToJsonElement(Backup.encode(sample())).jsonObject
+        val old = JsonObject(json - setOf("exercises", "workouts", "savedWorkouts", "restSeconds") + ("format" to JsonPrimitive(1))).toString()
+        assertTrue(!old.contains("savedWorkouts"))
+        val b = Backup.decode(old)
+        assertEquals(1, b.format)
+        assertEquals(emptyList(), b.workouts)
+        assertEquals(sample().entries, b.entries)
+    }
+
+    @Test
+    fun workoutsComeBackTheSame() {
+        val squat = Exercises.builtIn("b:squat")!!
+        val w = Workout(
+            id = 3, name = "Leg day", day = day, startedAt = 1000, endedAt = 61000, savedWorkoutId = 2, burnedKcal = 290.0,
+            exercises = listOf(WorkoutExercise(squat, listOf(WorkoutSet(80.0, 5, done = true, doneAt = 5000)))),
+        )
+        val b = sample().copy(
+            exercises = listOf(Exercises.own(1, "Sled push", ExerciseKind.WEIGHTS)),
+            workouts = listOf(w),
+            savedWorkouts = listOf(SavedWorkout(2, "Leg day", listOf(SavedWorkoutItem(squat, 3)), 1)),
+            restSeconds = mapOf("b:squat" to 120),
+        )
+        assertEquals(b, Backup.decode(Backup.encode(b)))
     }
 
     @Test

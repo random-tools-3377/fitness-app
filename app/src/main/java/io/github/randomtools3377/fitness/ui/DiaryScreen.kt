@@ -73,6 +73,8 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
     val water by vm.water.collectAsState()
     val settings by vm.settings.collectAsState()
     val units by vm.units.collectAsState()
+    val burned by vm.dayBurned.collectAsState()
+    val dayWorkouts by vm.dayWorkouts.collectAsState()
     var editing by remember { mutableStateOf<DiaryEntry?>(null) }
     var savingMeal by remember { mutableStateOf<Meal?>(null) }
     var dayMenu by remember { mutableStateOf(false) }
@@ -111,7 +113,20 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
             }
         }
 
-        item { SummaryCard(totals.total, settings.targetKcal, settings.macros.grams(settings.targetKcal ?: 0), units, open) }
+        item { SummaryCard(totals.total, burned, settings.burnedHalf, settings.targetKcal, settings.macros.grams(settings.targetKcal ?: 0), units, open) }
+
+        if (dayWorkouts.isNotEmpty()) {
+            item {
+                Section("Workouts") {
+                    for (w in dayWorkouts) {
+                        Row(Modifier.fillMaxWidth().testTag("day-workout:${w.name}"), verticalAlignment = Alignment.CenterVertically) {
+                            Text(w.name, Modifier.weight(1f))
+                            Text(burnedText(w.burnedKcal * (if (settings.burnedHalf) 0.5 else 1.0), units), color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                }
+            }
+        }
 
         item {
             val ml = Water.total(water, day)
@@ -180,21 +195,22 @@ fun DiaryScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit) {
 }
 
 @Composable
-private fun SummaryCard(eaten: Nutrients, targetKcal: Int?, macroTargets: Nutrients, units: UnitSettings, open: (Route) -> Unit) {
+private fun SummaryCard(eaten: Nutrients, burned: Double, half: Boolean, targetKcal: Int?, macroTargets: Nutrients, units: UnitSettings, open: (Route) -> Unit) {
     Section("Calories") {
         LabelValue("Eaten", energy(eaten.kcal, units), tag = "day-kcal")
+        if (burned > 0) LabelValue(if (half) "Burned in workouts (half)" else "Burned in workouts", energy(burned, units), tag = "day-burned")
         if (targetKcal == null) {
             Text("Set a daily target to see what is left.", style = MaterialTheme.typography.bodyMedium)
             Button(onClick = { open(Route.Target) }, modifier = Modifier.testTag("set-target")) { Text("Set my target") }
         } else {
-            val left = targetKcal - eaten.kcal
+            val left = targetKcal + burned - eaten.kcal
             LabelValue("Target", energy(targetKcal.toDouble(), units), tag = "day-target")
             LabelValue(
                 if (left >= 0) "Left" else "Over",
                 energy(kotlin.math.abs(left), units),
                 tag = "day-left",
             )
-            LinearProgressIndicator(progress = { (eaten.kcal / targetKcal).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(progress = { (eaten.kcal / (targetKcal + burned)).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
         }
         HorizontalDivider()
         MacroRow("Protein", eaten.protein, if (targetKcal != null) macroTargets.protein else null)

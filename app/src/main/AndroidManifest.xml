@@ -13,6 +13,17 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" tools:node="remove" />
 
     <!--
+        The rest timer between sets (0.2.0): an alarm set on the phone, a buzz and a notification
+        when the rest is over and the app is in the background. No network involved.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!--
         No phone backup and no phone-to-phone transfer: Google or Samsung backup would upload
         the diary. allowBackup="false" covers cloud backup; the rules files also exclude
         everything, which covers device-to-device transfer on Android 12 and later. The backup
@@ -38,6 +49,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- The rest timer's alarm. -->
+        <receiver
+            android:name=".workout.RestDoneReceiver"
+            android:exported="false" />
 
         <!--
             EmojiCompat's start-up step asks a font provider (Google Play services) for an

@@ -86,6 +86,12 @@ object Units {
         VolumeUnit.FL_OZ -> "${oneDecimal(mlToShown(ml, u))} fl oz"
     }
 
+    fun kmToShown(km: Double, u: DistanceUnit) = if (u == DistanceUnit.KM) km else km / KM_PER_MILE
+    fun shownToKm(x: Double, u: DistanceUnit) = if (u == DistanceUnit.KM) x else x * KM_PER_MILE
+
+    /** "5 km", "3.1 miles". */
+    fun distance(km: Double, u: DistanceUnit): String = "${oneDecimal(kmToShown(km, u))} ${u.short}"
+
     /** Grams, rounded to whole grams, or one decimal below 10 g: "32 g", "4.5 g". */
     fun grams(g: Double): String = if (g < 9.95) "${oneDecimal(g)} g" else "${g.roundToInt()} g"
 

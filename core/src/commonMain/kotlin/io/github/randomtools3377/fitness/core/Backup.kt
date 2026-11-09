@@ -17,6 +17,8 @@ data class AppSettings(
     val water: WaterSettings = WaterSettings(),
     /** Null means the units follow the phone's region. */
     val units: UnitSettings? = null,
+    /** Count only half of the calories workouts burn, as estimates tend to run high (format 2). */
+    val burnedHalf: Boolean = false,
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -50,12 +52,18 @@ data class Backup(
     val water: List<WaterEntry>,
     val weighIns: List<WeighIn>,
     val settings: AppSettings,
+    /** Workouts (format 2). */
+    val exercises: List<Exercise> = emptyList(),
+    val workouts: List<Workout> = emptyList(),
+    val savedWorkouts: List<SavedWorkout> = emptyList(),
+    /** Rest between sets, in seconds, for each exercise whose rest was changed, by its key. */
+    val restSeconds: Map<String, Int> = emptyMap(),
 ) {
     companion object {
         const val APP = "fitness"
 
         /** Raised whenever the file's layout changes in a way older versions can't read. */
-        const val FORMAT = 1
+        const val FORMAT = 2
 
         private val json = Json {
             prettyPrint = true

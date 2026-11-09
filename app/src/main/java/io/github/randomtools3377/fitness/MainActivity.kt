@@ -8,16 +8,18 @@ import androidx.activity.viewModels
 import io.github.randomtools3377.fitness.ui.FitnessApp
 import io.github.randomtools3377.fitness.ui.FitnessTheme
 import io.github.randomtools3377.fitness.ui.MainViewModel
+import io.github.randomtools3377.fitness.ui.WorkoutViewModel
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
+    private val wvm: WorkoutViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             FitnessTheme {
-                FitnessApp(vm)
+                FitnessApp(vm, wvm)
             }
         }
     }

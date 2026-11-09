@@ -1,6 +1,7 @@
 package io.github.randomtools3377.fitness.data
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -15,6 +16,15 @@ import androidx.room.Update
 import androidx.room.Upsert
 import io.github.randomtools3377.fitness.core.Amount
 import io.github.randomtools3377.fitness.core.BaseUnit
+import io.github.randomtools3377.fitness.core.CardioType
+import io.github.randomtools3377.fitness.core.Exercise
+import io.github.randomtools3377.fitness.core.ExerciseKind
+import io.github.randomtools3377.fitness.core.Exercises
+import io.github.randomtools3377.fitness.core.SavedWorkout
+import io.github.randomtools3377.fitness.core.SavedWorkoutItem
+import io.github.randomtools3377.fitness.core.Workout
+import io.github.randomtools3377.fitness.core.WorkoutExercise
+import io.github.randomtools3377.fitness.core.WorkoutSet
 import io.github.randomtools3377.fitness.core.DiaryEntry
 import io.github.randomtools3377.fitness.core.Food
 import io.github.randomtools3377.fitness.core.Meal
@@ -111,6 +121,85 @@ data class WeighInRow(
 data class SettingRow(
     @PrimaryKey val key: String,
     val value: String,
+)
+
+/** An exercise of the user's own. The built-in ones live in the shared code. */
+@Entity(tableName = "exercises")
+data class ExerciseRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val kind: String,
+    val hidden: Boolean = false,
+)
+
+/** Rest between sets for an exercise whose rest was changed, by its key ("b:squat", "u:3"). */
+@Entity(tableName = "rest_times")
+data class RestRow(
+    @PrimaryKey val exerciseKey: String,
+    val seconds: Int,
+)
+
+@Entity(tableName = "workouts", indices = [Index("day")])
+data class WorkoutRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val day: Long,
+    val name: String,
+    val startedAt: Long,
+    /** Null while the workout is in progress. */
+    val endedAt: Long?,
+    val savedWorkoutId: Long?,
+    val burnedKcal: Double,
+)
+
+/** One set of one exercise in a workout. The exercise is copied in, so the row stands alone. */
+@Entity(
+    tableName = "workout_sets",
+    foreignKeys = [ForeignKey(entity = WorkoutRow::class, parentColumns = ["id"], childColumns = ["workoutId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("workoutId")],
+)
+data class WorkoutSetRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workoutId: Long,
+    /** The exercise's place in the workout. */
+    val position: Int,
+    val setIndex: Int,
+    val exerciseKey: String,
+    val exerciseName: String,
+    val kind: String,
+    val met: Double,
+    val muscle: String,
+    val cardio: String,
+    val weightKg: Double?,
+    val reps: Int?,
+    val seconds: Int?,
+    val distanceKm: Double?,
+    val done: Boolean,
+    val doneAt: Long?,
+)
+
+@Entity(tableName = "saved_workouts")
+data class SavedWorkoutRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val createdAt: Long,
+)
+
+@Entity(
+    tableName = "saved_workout_items",
+    foreignKeys = [ForeignKey(entity = SavedWorkoutRow::class, parentColumns = ["id"], childColumns = ["savedId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("savedId")],
+)
+data class SavedWorkoutItemRow(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val savedId: Long,
+    val position: Int,
+    val exerciseKey: String,
+    val exerciseName: String,
+    val kind: String,
+    val met: Double,
+    val muscle: String,
+    val cardio: String,
+    val sets: Int,
 )
 
 /** How often and how lately each food was logged. */
@@ -239,6 +328,88 @@ interface FitnessDao {
     @Insert
     suspend fun insertFoods(rows: List<FoodRow>)
 
+    // Exercises of the user's own, and rest times.
+    @Query("SELECT * FROM exercises ORDER BY name COLLATE NOCASE")
+    fun exercises(): Flow<List<ExerciseRow>>
+
+    @Query("SELECT * FROM exercises ORDER BY id")
+    suspend fun allExercises(): List<ExerciseRow>
+
+    @Insert
+    suspend fun insertExercise(row: ExerciseRow): Long
+
+    @Insert
+    suspend fun insertExercises(rows: List<ExerciseRow>)
+
+    @Query("UPDATE exercises SET hidden = 1 WHERE id = :id")
+    suspend fun hideExercise(id: Long)
+
+    @Query("SELECT * FROM rest_times")
+    fun restTimes(): Flow<List<RestRow>>
+
+    @Query("SELECT * FROM rest_times")
+    suspend fun allRestTimes(): List<RestRow>
+
+    @Upsert
+    suspend fun putRest(row: RestRow)
+
+    // Workouts.
+    @Query("SELECT * FROM workouts ORDER BY startedAt")
+    fun workouts(): Flow<List<WorkoutRow>>
+
+    @Query("SELECT * FROM workout_sets ORDER BY workoutId, position, setIndex")
+    fun workoutSets(): Flow<List<WorkoutSetRow>>
+
+    @Query("SELECT * FROM workouts ORDER BY startedAt")
+    suspend fun allWorkouts(): List<WorkoutRow>
+
+    @Query("SELECT * FROM workout_sets ORDER BY workoutId, position, setIndex")
+    suspend fun allWorkoutSets(): List<WorkoutSetRow>
+
+    @Insert
+    suspend fun insertWorkout(row: WorkoutRow): Long
+
+    @Update
+    suspend fun updateWorkout(row: WorkoutRow)
+
+    @Query("DELETE FROM workouts WHERE id = :id")
+    suspend fun deleteWorkout(id: Long)
+
+    @Query("DELETE FROM workout_sets WHERE workoutId = :id")
+    suspend fun deleteSetsOf(id: Long)
+
+    @Insert
+    suspend fun insertWorkoutSets(rows: List<WorkoutSetRow>)
+
+    // Saved workouts.
+    @Query("SELECT * FROM saved_workouts ORDER BY name COLLATE NOCASE")
+    fun savedWorkouts(): Flow<List<SavedWorkoutRow>>
+
+    @Query("SELECT * FROM saved_workout_items ORDER BY savedId, position")
+    fun savedWorkoutItems(): Flow<List<SavedWorkoutItemRow>>
+
+    @Query("SELECT * FROM saved_workouts ORDER BY id")
+    suspend fun allSavedWorkouts(): List<SavedWorkoutRow>
+
+    @Query("SELECT * FROM saved_workout_items ORDER BY savedId, position")
+    suspend fun allSavedWorkoutItems(): List<SavedWorkoutItemRow>
+
+    @Insert
+    suspend fun insertSavedWorkout(row: SavedWorkoutRow): Long
+
+    @Insert
+    suspend fun insertSavedWorkoutItems(rows: List<SavedWorkoutItemRow>)
+
+    @Query("DELETE FROM saved_workouts WHERE id = :id")
+    suspend fun deleteSavedWorkout(id: Long)
+
+    @Query("DELETE FROM exercises") suspend fun clearExercises()
+    @Query("DELETE FROM rest_times") suspend fun clearRestTimes()
+    @Query("DELETE FROM workout_sets") suspend fun clearWorkoutSets()
+    @Query("DELETE FROM workouts") suspend fun clearWorkouts()
+    @Query("DELETE FROM saved_workout_items") suspend fun clearSavedWorkoutItems()
+    @Query("DELETE FROM saved_workouts") suspend fun clearSavedWorkouts()
+
     @Insert
     suspend fun insertSavedMeals(rows: List<SavedMealRow>)
 }
@@ -248,9 +419,14 @@ interface FitnessDao {
  * can move the user's data forward with a migration instead of losing it.
  */
 @Database(
-    entities = [FoodRow::class, EntryRow::class, SavedMealRow::class, SavedMealItemRow::class, WaterRow::class, WeighInRow::class, SettingRow::class],
-    version = 1,
+    entities = [
+        FoodRow::class, EntryRow::class, SavedMealRow::class, SavedMealItemRow::class, WaterRow::class, WeighInRow::class, SettingRow::class,
+        // Version 2 (0.2.0): workouts.
+        ExerciseRow::class, RestRow::class, WorkoutRow::class, WorkoutSetRow::class, SavedWorkoutRow::class, SavedWorkoutItemRow::class,
+    ],
+    version = 2,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
@@ -311,3 +487,55 @@ fun WaterRow.toCore() = WaterEntry(id, dayOf(day), ml, at)
 fun WaterEntry.toRow() = WaterRow(id, day.toDay(), ml, at)
 fun WeighInRow.toCore() = WeighIn(id, dayOf(day), kg, at)
 fun WeighIn.toRow() = WeighInRow(id, day.toDay(), kg, at)
+
+fun ExerciseRow.toCore() = Exercises.own(id, name, ExerciseKind.valueOf(kind))
+
+private fun exerciseOf(key: String, name: String, kind: String, met: Double, muscle: String, cardio: String) =
+    Exercise(key, name, ExerciseKind.valueOf(kind), met, muscle, CardioType.valueOf(cardio))
+
+fun workoutsOf(rows: List<WorkoutRow>, sets: List<WorkoutSetRow>): List<Workout> {
+    val byWorkout = sets.groupBy { it.workoutId }
+    return rows.map { r ->
+        val exercises = byWorkout[r.id].orEmpty().groupBy { it.position }.toSortedMap().values.map { list ->
+            val f = list.first()
+            WorkoutExercise(
+                exerciseOf(f.exerciseKey, f.exerciseName, f.kind, f.met, f.muscle, f.cardio),
+                list.sortedBy { it.setIndex }.map { WorkoutSet(it.weightKg, it.reps, it.seconds, it.distanceKm, it.done, it.doneAt) },
+            )
+        }
+        Workout(r.id, r.name, dayOf(r.day), r.startedAt, r.endedAt, exercises, r.savedWorkoutId, r.burnedKcal)
+    }
+}
+
+fun Workout.toRow() = WorkoutRow(id, day.toDay(), name, startedAt, endedAt, savedWorkoutId, burnedKcal)
+
+fun Workout.setRows(workoutId: Long): List<WorkoutSetRow> = exercises.flatMapIndexed { position, we ->
+    we.sets.mapIndexed { i, s ->
+        WorkoutSetRow(
+            workoutId = workoutId, position = position, setIndex = i,
+            exerciseKey = we.exercise.key, exerciseName = we.exercise.name, kind = we.exercise.kind.name, met = we.exercise.met,
+            muscle = we.exercise.muscle, cardio = we.exercise.cardio.name,
+            weightKg = s.weightKg, reps = s.reps, seconds = s.seconds, distanceKm = s.distanceKm, done = s.done, doneAt = s.doneAt,
+        )
+    }
+}
+
+fun savedWorkoutsOf(rows: List<SavedWorkoutRow>, items: List<SavedWorkoutItemRow>): List<SavedWorkout> {
+    val bySaved = items.groupBy { it.savedId }
+    return rows.map { r ->
+        SavedWorkout(
+            r.id, r.name,
+            bySaved[r.id].orEmpty().sortedBy { it.position }.map {
+                SavedWorkoutItem(exerciseOf(it.exerciseKey, it.exerciseName, it.kind, it.met, it.muscle, it.cardio), it.sets)
+            },
+            r.createdAt,
+        )
+    }
+}
+
+fun SavedWorkout.itemRows(savedId: Long) = items.mapIndexed { i, it ->
+    SavedWorkoutItemRow(
+        savedId = savedId, position = i, exerciseKey = it.exercise.key, exerciseName = it.exercise.name, kind = it.exercise.kind.name,
+        met = it.exercise.met, muscle = it.exercise.muscle, cardio = it.exercise.cardio.name, sets = it.sets,
+    )
+}

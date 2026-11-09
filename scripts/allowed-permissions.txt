@@ -3,3 +3,9 @@
 
 # Added by AndroidX so the app's own broadcast receivers are private to it. Not a network permission.
 ${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+
+# The rest timer between sets (0.2.0): an alarm on the phone, a notification and a buzz.
+android.permission.POST_NOTIFICATIONS
+android.permission.USE_EXACT_ALARM
+android.permission.SCHEDULE_EXACT_ALARM
+android.permission.VIBRATE

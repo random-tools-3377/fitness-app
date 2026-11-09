@@ -28,6 +28,7 @@ import io.github.randomtools3377.fitness.core.WaterEntry
 import io.github.randomtools3377.fitness.core.WaterSettings
 import io.github.randomtools3377.fitness.core.WeighIn
 import io.github.randomtools3377.fitness.core.Weight
+import io.github.randomtools3377.fitness.core.Workout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -82,6 +83,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, DayTotals.of(emptyList()))
     val water: StateFlow<List<WaterEntry>> = day.flatMapLatest { repo.water(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** The day's finished workouts. */
+    val dayWorkouts: StateFlow<List<Workout>> = day.flatMapLatest { d -> repo.workouts.map { all -> all.filter { it.finished && it.day == d } } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Calories burned in the day's workouts, added to the day's allowance (half, if chosen). */
+    val dayBurned: StateFlow<Double> = combine(dayWorkouts, settings) { list, s ->
+        list.sumOf { it.burnedKcal } * (if (s.burnedHalf) 0.5 else 1.0)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+
+    fun setBurnedHalf(half: Boolean) = launchSafely { repo.updateSettings { it.copy(burnedHalf = half) } }
+
     val weighIns: StateFlow<List<WeighIn>> = repo.weighIns.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val foods: StateFlow<List<Food>> = repo.foods.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val savedMeals: StateFlow<List<SavedMeal>> = repo.savedMeals.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
