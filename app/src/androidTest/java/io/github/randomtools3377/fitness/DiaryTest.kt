@@ -77,7 +77,7 @@ class DiaryTest {
 
         // It is remembered among the user's foods.
         app.onNodeWithTag("nav:foods").performClick()
-        app.waitFor { !gone("my-food:Test oats") }
+        app.waitFor { app.shownIn("foods-list", "my-food:Test oats") }
     }
 
     @Test
