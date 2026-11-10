@@ -73,8 +73,8 @@ data class Exercise(
     val track: List<Track>? = null,
     val secondsPerRep: Double = Exercises.SECONDS_PER_REP,
 ) {
-    /** What is logged for each set. */
-    val tracks: List<Track> get() = track?.takeIf { it.isNotEmpty() } ?: Track.usual(kind)
+    /** What is logged for each set: the user's choice, or else the usual for this exercise. */
+    val tracks: List<Track> get() = track?.takeIf { it.isNotEmpty() } ?: Exercises.usualTrack(this)
 
     /** Logged in minutes, like a run: no rest timer after each set. */
     val long: Boolean get() = Track.MINUTES in tracks
@@ -260,6 +260,9 @@ object Exercises {
 
     /** How long one rep takes, for the calories of sets counted in reps (0.20.0). */
     const val SECONDS_PER_REP = 3.0
+
+    /** What [e] logs unless the user changes it: its built-in choice, or the usual for its tag. */
+    fun usualTrack(e: Exercise): List<Track> = (if (e.key.startsWith("b:")) builtIn(e.key)?.track else null) ?: Track.usual(e.kind)
 
     /** [e] with what the user chose to log for it, if they changed it. */
     fun withTrack(e: Exercise, chosen: Map<String, List<Track>>): Exercise = chosen[e.key]?.let { e.copy(track = it) } ?: e

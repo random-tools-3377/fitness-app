@@ -139,6 +139,8 @@ class WorkoutsTest {
         val jacks = Exercises.builtIn("b:jumping-jacks")!!
         assertEquals(ExerciseKind.CARDIO, jacks.kind)
         assertEquals(listOf(Track.REPS), jacks.tracks)
+        // Stored without its choice (as in the database), it still logs reps.
+        assertEquals(listOf(Track.REPS), jacks.copy(track = null).tracks)
         val chosen = mapOf(run.key to listOf(Track.REPS))
         assertEquals(listOf(Track.REPS), Exercises.withTrack(run, chosen).tracks)
         assertEquals(run, Exercises.withTrack(run, emptyMap()))

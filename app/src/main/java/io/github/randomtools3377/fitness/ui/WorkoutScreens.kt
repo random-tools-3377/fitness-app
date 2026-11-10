@@ -675,8 +675,9 @@ fun TrackDialog(e: Exercise, onSave: (List<Track>) -> Unit, onDismiss: () -> Uni
                     "Pick any mix, like reps for cardio. It's kept for this exercise from now on. Its tag (${e.kind.title}) stays as it is.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                if (chosen != Track.usual(e.kind)) {
-                    TextButton(onClick = { chosen = Track.usual(e.kind) }) { Text("Back to the usual for ${e.kind.title}") }
+                val usual = Exercises.usualTrack(e)
+                if (chosen != usual) {
+                    TextButton(onClick = { chosen = usual }) { Text("Back to the usual: " + usual.joinToString(", ") { it.title.lowercase() }) }
                 }
             }
         },

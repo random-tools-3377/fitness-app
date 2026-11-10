@@ -82,7 +82,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     fun setTrack(e: Exercise, chosen: List<Track>) = viewModelScope.launch {
         val t = Track.ordered(chosen)
         if (t.isEmpty()) return@launch
-        val usual = t == Track.usual(e.kind)
+        val usual = t == Exercises.usualTrack(e)
         repo.updateSettings { s -> s.copy(exerciseTracks = if (usual) s.exerciseTracks - e.key else s.exerciseTracks + (e.key to t)) }
         change { w -> w.copy(exercises = w.exercises.map { we -> if (we.exercise.key == e.key) we.copy(exercise = we.exercise.copy(track = if (usual) null else t)) else we }) }
     }
