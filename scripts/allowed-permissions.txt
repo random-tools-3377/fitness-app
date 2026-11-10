@@ -23,3 +23,7 @@ android.permission.USE_FINGERPRINT
 # Steps from the phone (0.10.0): read-only, from Health Connect, which works offline. Asked when
 # the user turns steps on.
 android.permission.health.READ_STEPS
+
+# Saying a meal (0.18.0, optional AI): asked the first time the user taps Say it. The recording
+# stays in memory, is turned into text on the phone, and is never saved.
+android.permission.RECORD_AUDIO

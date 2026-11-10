@@ -18,13 +18,16 @@ for f in "$dir"/fitness-ai-*.zip; do
   name="$(basename "$f")"
   case "$name" in
     fitness-ai-labels.zip) what="Better label reading: reads more of a nutrition label's numbers right." ;;
+    fitness-ai-text.zip) what="Describe a meal, paste a recipe, and the weekly summary in words." ;;
+    fitness-ai-speech.zip) what="Say a meal (needs the meals file too)." ;;
+    fitness-ai-plate.zip) what="Foods from a photo of a plate." ;;
     *) what="" ;;
   esac
   printf '| %s | %s | %.0f MB |\n' "$name" "$what" "$(echo "$(stat -c %s "$f") / 1000000" | bc -l)" >> "$notes"
 done
 cat >> "$notes" <<'MD'
 
-**Credits.** Label reading: PaddleOCR's PP-OCRv6 small text detection and recognition models, copyright Baidu and/or the PaddleOCR rights holders, under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), converted to ONNX by [RapidOCR](https://github.com/RapidAI/RapidOCR) (Apache License 2.0). The licence and notices are inside the file.
+**Credits.** Meals, recipes and summaries: Qwen3 1.7B, by the Qwen team, Alibaba Cloud. Speech: Qwen3-ASR 0.6B, by the Qwen team, Alibaba Cloud. Plate photos: SmolVLM 500M Instruct, by Hugging Face. All under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), run on the phone with [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT). Label reading: PaddleOCR's PP-OCRv6 small text detection and recognition models, copyright Baidu and/or the PaddleOCR rights holders, under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), converted to ONNX by [RapidOCR](https://github.com/RapidAI/RapidOCR) (Apache License 2.0). The licence and notices are inside the file.
 MD
 if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
   gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "AI models (optional)" \

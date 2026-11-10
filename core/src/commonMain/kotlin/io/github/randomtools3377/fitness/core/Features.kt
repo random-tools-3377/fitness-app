@@ -5,7 +5,14 @@ package io.github.randomtools3377.fitness.core
  * The food diary and Settings always stay. [startsOn] is for a new install. [ai] marks the
  * optional on-phone AI parts (0.16.0), which are listed apart and need a model file.
  */
-enum class Feature(val title: String, val description: String, val startsOn: Boolean = false, val ai: Boolean = false) {
+enum class Feature(
+    val title: String,
+    val description: String,
+    val startsOn: Boolean = false,
+    val ai: Boolean = false,
+    /** The AI files it needs (see the app's AiModels). */
+    val models: List<String> = emptyList(),
+) {
     WORKOUTS("Workouts", "Log weights, cardio and bodyweight exercises, with a rest timer and personal bests.", startsOn = true),
     WATER("Water", "A daily water target with buttons for a glass or a bottle.", startsOn = true),
     WEIGHT("Weight", "Weigh-ins with a chart and a 7-day average.", startsOn = true),
@@ -32,6 +39,37 @@ enum class Feature(val title: String, val description: String, val startsOn: Boo
         "Better label reading",
         "Reads more of a label's numbers right, using a larger reading model on the phone. Needs a one-time 27 MB download.",
         ai = true,
+        models = listOf("labels"),
+    ),
+    AI_MEALS(
+        "Describe a meal",
+        "Type what you ate, like \"two eggs and a slice of toast\", and the AI finds the foods and amounts for you to check. Needs a one-time 1.3 GB download.",
+        ai = true,
+        models = listOf("text"),
+    ),
+    AI_VOICE(
+        "Say a meal",
+        "Say what you ate instead of typing it. Comes with Describe a meal, and needs a one-time 1 GB download as well.",
+        ai = true,
+        models = listOf("text", "speech"),
+    ),
+    AI_PLATE(
+        "Foods from a photo of a plate",
+        "Take a photo of your meal and the AI suggests the foods on it; you pick them and say how much. Needs a one-time 0.5 GB download.",
+        ai = true,
+        models = listOf("plate"),
+    ),
+    AI_RECIPES(
+        "Paste a recipe",
+        "Paste a recipe's text and the AI lists its ingredients, ready to check and save as a recipe. Uses the same 1.3 GB download as Describe a meal.",
+        ai = true,
+        models = listOf("text"),
+    ),
+    AI_SUMMARY(
+        "Weekly summary in words",
+        "A few plain sentences about your week, written from your numbers. Uses the same 1.3 GB download as Describe a meal.",
+        ai = true,
+        models = listOf("text"),
     ),
 }
 
@@ -78,10 +116,14 @@ object Features {
         if (s.programme.isNotEmpty() || s.exerciseNotes.isNotEmpty()) add(Feature.TRAINING_EXTRAS)
     }
 
-    /** Switching one part on can need another: better label reading needs reading labels. */
+    /** Switching one part on can need another: better label reading needs reading labels, saying a meal needs describing one, and pasting a recipe needs recipes. */
     fun switch(on: Set<Feature>, f: Feature, isOn: Boolean): Set<Feature> = when {
         isOn && f == Feature.AI_LABELS -> on + f + Feature.LABEL_PHOTO
         !isOn && f == Feature.LABEL_PHOTO -> on - f - Feature.AI_LABELS
+        isOn && f == Feature.AI_VOICE -> on + f + Feature.AI_MEALS
+        !isOn && f == Feature.AI_MEALS -> on - f - Feature.AI_VOICE
+        isOn && f == Feature.AI_RECIPES -> on + f + Feature.PLANNING
+        !isOn && f == Feature.PLANNING -> on - f - Feature.AI_RECIPES
         isOn -> on + f
         else -> on - f
     }

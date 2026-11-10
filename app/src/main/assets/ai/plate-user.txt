@@ -1,0 +1,1 @@
+{media}Which foods are on this plate? Answer with a short list of the foods only, separated by commas.

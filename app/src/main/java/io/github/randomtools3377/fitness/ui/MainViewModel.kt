@@ -471,8 +471,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val app = getApplication<Application>()
             try {
-                io.github.randomtools3377.fitness.ai.AiModels.install(app, uri)
-                message.value = "Ready: better label reading is on the phone"
+                val id = io.github.randomtools3377.fitness.ai.AiModels.install(app, uri)
+                message.value = "Ready: the AI file for ${io.github.randomtools3377.fitness.ai.AiModels.describe(id).substringBefore(',')} is on the phone"
             } catch (e: io.github.randomtools3377.fitness.ai.AiModels.NotAModelFile) {
                 message.value = e.message
             } catch (e: Exception) {

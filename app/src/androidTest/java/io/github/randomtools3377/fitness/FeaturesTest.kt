@@ -51,11 +51,11 @@ class FeaturesTest {
         app.waitFor { !gone("features-list") }
         // Off to start, with no file asked for.
         app.onNodeWithTag("features-list").performScrollToNode(hasTestTag("feature:AI_LABELS"))
-        app.waitFor { gone("ai-open:labels") }
+        app.waitFor { gone("ai-open") }
         app.tapIn("features-list", "feature:AI_LABELS")
         // Switched on, it asks for the model file, and reading labels comes on with it.
-        app.onNodeWithTag("features-list").performScrollToNode(hasTestTag("ai-open:labels"))
-        app.waitFor { !gone("ai-open:labels") }
+        app.onNodeWithTag("features-list").performScrollToNode(hasTestTag("ai-open"))
+        app.waitFor { !gone("ai-open") }
         app.onNodeWithTag("features-list").performScrollToNode(hasTestTag("feature:LABEL_PHOTO"))
         app.onNodeWithTag("feature:LABEL_PHOTO").assertIsOn()
     }

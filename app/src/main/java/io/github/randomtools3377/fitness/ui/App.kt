@@ -91,6 +91,9 @@ sealed interface Route {
 
     /** Any colour for the app, from the colour picker (0.17.0). */
     data object AppColour : Route
+
+    /** Adding foods with the optional on-phone AI (0.18.0 onwards). */
+    data class AiFoods(val kind: AiKind, val meal: Meal = Meal.LUNCH, val mode: AddMode = AddMode.LOG, val planDay: kotlinx.datetime.LocalDate? = null) : Route
 }
 
 @Composable
@@ -269,6 +272,12 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
                 newFood = { code -> open(Route.FoodForm(meal = top.meal, barcode = code)) },
                 mode = top.mode,
                 planDay = top.planDay,
+                ai = { kind -> back(); open(Route.AiFoods(kind, top.meal, top.mode, top.planDay)) },
+            )
+            is Route.AiFoods -> AiFoodsScreen(
+                vm, top.kind, top.meal, top.mode, top.planDay, modifier,
+                back = ::back,
+                openRecipe = { back(); open(Route.Recipe) },
             )
             Route.Recipe -> RecipeScreen(vm, modifier, back = ::back, addFood = { open(Route.AddFood(Meal.LUNCH, mode = AddMode.RECIPE)) })
             Route.Settings -> Column(modifier) {

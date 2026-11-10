@@ -26,6 +26,13 @@ android {
         targetSdk = 35
         versionName = appVersionName
         versionCode = versionCodeOf(appVersionName)
+        // The optional on-phone AI (0.18.0): llama.cpp, for 64-bit ARM phones only.
+        externalNativeBuild {
+            cmake {
+                abiFilters += "arm64-v8a"
+                arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=c++_shared")
+            }
+        }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -58,6 +65,12 @@ android {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -66,6 +79,8 @@ android {
         // On an x86 device the optional reader can't load, and labels are read with Tesseract.
         jniLibs {
             excludes += setOf("lib/x86/libonnxruntime*.so", "lib/x86_64/libonnxruntime*.so")
+            // The AI engine (0.18.0) finds its CPU variants as files next to the app's own libraries.
+            useLegacyPackaging = true
         }
     }
 }

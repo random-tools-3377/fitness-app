@@ -1,0 +1,16 @@
+two boiled eggs and a mug of tea with milk
+-----
+boiled egg | 2 | piece
+tea with milk | 1 | cup
+=====
+150g of rice, half a chicken breast and a glass of orange juice
+-----
+rice | 150 | g
+chicken breast | 0.5 | piece
+orange juice | 1 | glass
+=====
+a bowl of cereal with semi-skimmed milk and a can of lemonade
+-----
+cereal | 1 | bowl
+semi-skimmed milk | 1 | serving
+lemonade | 1 | can

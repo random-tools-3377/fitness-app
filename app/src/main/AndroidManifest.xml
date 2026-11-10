@@ -28,6 +28,8 @@
 
     <!-- Steps (0.10.0), read from Health Connect on the phone when the user turns them on. -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <!-- "Say a meal" (0.18.0): asked the first time the user taps Say it. Recordings stay in memory and are never saved. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />

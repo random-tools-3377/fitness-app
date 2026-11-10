@@ -38,4 +38,13 @@ class FeaturesTest {
         assertTrue(ai.none { it in Features.STARTS_ON })
         assertTrue(ai.none { it in Features.firstChoice(AppSettings(), FeatureUse(hasWorkouts = true)) })
     }
+
+    @Test
+    fun aiPartsBringWhatTheyNeed() {
+        val voice = Features.switch(Features.STARTS_ON, Feature.AI_VOICE, true)
+        assertTrue(Feature.AI_MEALS in voice)
+        assertTrue(Feature.AI_VOICE !in Features.switch(voice, Feature.AI_MEALS, false))
+        assertTrue(Feature.PLANNING in Features.switch(Features.STARTS_ON, Feature.AI_RECIPES, true))
+        assertTrue(Feature.entries.filter { it.ai }.all { it.models.isNotEmpty() })
+    }
 }
