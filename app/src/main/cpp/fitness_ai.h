@@ -28,9 +28,11 @@ const char * media_marker();
 
 // Answers [prompt] (already formatted), greedily, held to [grammar] (GBNF) when it isn't empty,
 // with at most [max_tokens]. [media] is a photo (JPEG/PNG) or a recording (WAV) for the marker in
-// the prompt, or null. [stop] is checked between tokens; when it is set, the answer so far is
-// returned. On failure, returns an empty string and sets [error].
+// the prompt, or null. [stop] is checked between tokens; when it is set, or after [max_seconds],
+// the answer so far is returned, so an answer can never hang. On failure, returns an empty
+// string and sets [error].
 std::string answer(Model * m, const std::string & prompt, const std::string & grammar, int max_tokens,
-                   const unsigned char * media, size_t media_len, const volatile bool * stop, std::string & error);
+                   const unsigned char * media, size_t media_len, const volatile bool * stop, std::string & error,
+                   int max_seconds = 120);
 
 }  // namespace fitai

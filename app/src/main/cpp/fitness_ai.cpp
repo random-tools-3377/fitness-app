@@ -1,6 +1,7 @@
 #include "fitness_ai.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -100,8 +101,10 @@ static bool feed_text(llama_context * ctx, const llama_vocab * vocab, const std:
 }
 
 std::string answer(Model * m, const std::string & prompt, const std::string & grammar, int max_tokens,
-                   const unsigned char * media, size_t media_len, const volatile bool * stop, std::string & error) {
+                   const unsigned char * media, size_t media_len, const volatile bool * stop, std::string & error,
+                   int max_seconds) {
     error.clear();
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(max_seconds);
     const llama_vocab * vocab = llama_model_get_vocab(m->model);
     llama_context_params cp = llama_context_default_params();
     cp.n_ctx = m->n_ctx;
@@ -146,6 +149,7 @@ std::string answer(Model * m, const std::string & prompt, const std::string & gr
     llama_batch_ext * batch = llama_batch_ext_init(ctx);
     for (int i = 0; i < max_tokens; i++) {
         if (stop && *stop) break;
+        if (std::chrono::steady_clock::now() > deadline) break;
         if (pos >= m->n_ctx - 1) break;
         llama_token t = llama_sampler_sample(smpl, ctx, -1);
         if (llama_vocab_is_eog(vocab, t)) break;

@@ -376,6 +376,10 @@ Decided on 2026-11-09: AI features are added, on these terms.
     read the numbers beside it.
   - On the Features page under "AI on this phone", each with its download size, and a note when
     a phone is likely too slow.
+  - No answer can hang: on the phone each stops after 2 minutes, keeping what it has. The AI
+    check (tools/ai-check, run from the Actions tab) tries the real models with the app's own
+    prompts; any sample answer that fails or takes over 2 minutes fails it, and the whole check
+    stops after 45 minutes, so a stuck model shows up in minutes, not hours.
   - Voice needs the microphone, asked the first time the user taps "Say it"; recordings stay in
     memory and are never saved.
   - Build order: 0.16.0 better label reading; then, after the look (0.17.0), 0.18.0 everything

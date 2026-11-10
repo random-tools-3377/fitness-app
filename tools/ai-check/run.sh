@@ -34,8 +34,17 @@ fetch() {
   fi
 }
 
-ask() {  # ask MODEL MMPROJ SYSTEM USER GRAMMAR MEDIA MAX PREFIX (at most 5 minutes each)
-  timeout 300 "$work/build/ai-check" "$@" 2>&1 | grep -v "^\s*$" || echo "(no answer within 5 minutes)"
+# Every answer must come within 2 minutes on the build machine (a phone is slower): one that
+# doesn't is a bug, like the grammar that once made each word take minutes. It is reported at
+# once and the check fails at the end, so a stuck answer never holds the check up for long.
+slow=0
+ask() {  # ask MODEL MMPROJ SYSTEM USER GRAMMAR MEDIA MAX PREFIX
+  local start=$SECONDS
+  if ! timeout 120 "$work/build/ai-check" "$@" > "$work/answer.txt" 2>&1; then
+    echo "!!! FAILED or no answer within 2 minutes ($((SECONDS - start)) s):"
+    slow=$((slow + 1))
+  fi
+  grep -v "^\s*$" "$work/answer.txt" || true
 }
 
 if [ "$step" = "probe" ]; then
@@ -91,3 +100,9 @@ if [ "$step" = "all" ] || [ "$step" = "plate" ]; then
     ask "$work/models/$PLATE_FILE" "$work/models/$PLATE_MMPROJ" "$assets/plate-system.txt" "$assets/plate-user.txt" "$assets/plate.gbnf" "$p" 80 -
   done
 fi
+
+if [ "$slow" -gt 0 ]; then
+  echo "$slow answer(s) failed or took over 2 minutes."
+  exit 1
+fi
+echo "All answers came within 2 minutes."
