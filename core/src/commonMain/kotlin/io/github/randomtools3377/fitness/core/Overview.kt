@@ -79,11 +79,9 @@ object YearReviews {
         var seconds = 0
         for (w in ws) for (we in w.exercises) for (s in we.sets) {
             if (!s.done || s.warmUp) continue
-            if (we.exercise.kind == ExerciseKind.WEIGHTS) lifted += (s.weightKg ?: 0.0) * (s.reps ?: 0)
-            if (we.exercise.kind == ExerciseKind.CARDIO) {
-                km += s.distanceKm ?: 0.0
-                seconds += s.seconds ?: 0
-            }
+            lifted += (s.weightKg ?: 0.0) * (s.reps ?: 0)
+            km += s.distanceKm ?: 0.0
+            if (we.exercise.kind == ExerciseKind.CARDIO) seconds += s.seconds ?: 0
         }
         val daily = Weight.daily(weighIns).filter { it.first.year == year }
         // Bests set this year: those whose day is in the year, counting every workout up to then.

@@ -60,26 +60,22 @@ object Bests {
     fun of(e: Exercise, s: WorkoutSet, day: LocalDate): List<Best> {
         if (!s.done || s.warmUp) return emptyList()
         val out = mutableListOf<Best>()
-        when (e.kind) {
-            ExerciseKind.WEIGHTS -> {
-                val kg = s.weightKg ?: return out
-                val reps = s.reps ?: return out
-                if (kg <= 0 || reps < 1) return out
-                out += Best(e, BestKind.HEAVIEST, kg, day = day)
-                out += Best(e, BestKind.REPS_AT_WEIGHT, reps.toDouble(), atKg = kg, day = day)
-                oneRepMax(kg, reps)?.let { out += Best(e, BestKind.ONE_REP_MAX, it, day = day) }
-            }
-            ExerciseKind.BODYWEIGHT -> s.reps?.takeIf { it > 0 }?.let { out += Best(e, BestKind.MOST_REPS, it.toDouble(), day = day) }
-            ExerciseKind.TIMED -> s.seconds?.takeIf { it > 0 }?.let { out += Best(e, BestKind.LONGEST_TIME, it.toDouble(), day = day) }
-            ExerciseKind.CARDIO -> {
-                val sec = s.seconds ?: 0
-                if (sec > 0) out += Best(e, BestKind.LONGEST_TIME, sec.toDouble(), day = day)
-                val km = s.distanceKm
-                if (km != null && km > 0) {
-                    out += Best(e, BestKind.LONGEST_DISTANCE, km, day = day)
-                    if (sec > 0) out += Best(e, BestKind.FASTEST, km / (sec / 3600.0), day = day)
-                }
-            }
+        // From what the set has (0.20.0), whatever the exercise's tag.
+        val kg = s.weightKg?.takeIf { it > 0 }
+        val reps = s.reps?.takeIf { it > 0 }
+        if (kg != null && reps != null) {
+            out += Best(e, BestKind.HEAVIEST, kg, day = day)
+            out += Best(e, BestKind.REPS_AT_WEIGHT, reps.toDouble(), atKg = kg, day = day)
+            oneRepMax(kg, reps)?.let { out += Best(e, BestKind.ONE_REP_MAX, it, day = day) }
+        } else if (reps != null && Track.WEIGHT !in e.tracks) {
+            out += Best(e, BestKind.MOST_REPS, reps.toDouble(), day = day)
+        }
+        val sec = s.seconds ?: 0
+        if (sec > 0) out += Best(e, BestKind.LONGEST_TIME, sec.toDouble(), day = day)
+        val km = s.distanceKm
+        if (km != null && km > 0) {
+            out += Best(e, BestKind.LONGEST_DISTANCE, km, day = day)
+            if (sec > 0) out += Best(e, BestKind.FASTEST, km / (sec / 3600.0), day = day)
         }
         return out
     }

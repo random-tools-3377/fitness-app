@@ -261,8 +261,10 @@ class Repository(private val context: Context, val db: AppDatabase) {
     val savedWorkouts: Flow<List<SavedWorkout>> =
         combine(dao.savedWorkouts(), dao.savedWorkoutItems()) { r, i -> savedWorkoutsOf(r, i) }
 
+    /** Saves a new saved workout, or changes one (0.20.0), keeping its id for the weekly programme. */
     suspend fun saveSavedWorkout(sw: SavedWorkout): Long = db.withTransaction {
-        val id = dao.insertSavedWorkout(SavedWorkoutRow(name = sw.name, createdAt = sw.createdAt))
+        val id = if (sw.id == 0L) dao.insertSavedWorkout(SavedWorkoutRow(name = sw.name, createdAt = sw.createdAt))
+        else { dao.updateSavedWorkout(SavedWorkoutRow(sw.id, sw.name, sw.createdAt)); dao.deleteSavedWorkoutItems(sw.id); sw.id }
         dao.insertSavedWorkoutItems(sw.itemRows(id))
         id
     }

@@ -83,6 +83,9 @@ sealed interface Route {
 
     data object Bests : Route
 
+    /** Planning a saved workout ahead, or changing saved workout [id] (0.20.0). */
+    data class PlanWorkout(val id: Long = 0) : Route
+
     /** The interval timer (0.13.0). */
     data object Intervals : Route
 
@@ -305,6 +308,7 @@ fun FitnessApp(vm: MainViewModel, wvm: WorkoutViewModel, svm: StatsViewModel, bv
             Route.Target -> TargetScreen(vm, modifier, back = ::back)
             Route.ActiveWorkout -> ActiveWorkoutScreen(wvm, modifier, back = ::back)
             Route.Bests -> BestsScreen(wvm, modifier, back = ::back)
+            is Route.PlanWorkout -> PlanWorkoutScreen(wvm, top.id, modifier, back = ::back)
             Route.Intervals -> IntervalScreen(wvm, modifier, back = ::back)
             Route.Features -> FeaturesScreen(vm, modifier, back = ::back)
             Route.AppColour -> AppColourScreen(vm, settings.theme, modifier, back = ::back)

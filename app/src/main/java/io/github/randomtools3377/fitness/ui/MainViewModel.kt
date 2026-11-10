@@ -104,6 +104,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setBurnedHalf(half: Boolean) = launchSafely { repo.updateSettings { it.copy(burnedHalf = half) } }
 
+    /** Any settings change, saved at once. */
+    fun updateSettingsNow(f: (io.github.randomtools3377.fitness.core.AppSettings) -> io.github.randomtools3377.fitness.core.AppSettings) = launchSafely { repo.updateSettings(f) }
+
     private val noTargets: (LocalDate) -> Int? = { null }
 
     /** Each day's calorie target: by weekday, on training days, and in a diet break (0.11.0). */

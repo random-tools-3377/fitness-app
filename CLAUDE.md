@@ -125,12 +125,33 @@ workouts or exports.
     buzzes and shows a notification if the app is in the background.
   - A workout in progress survives the app being closed.
 
+Decided on 2026-11-10, after trying the workouts (0.20.0):
+
+- Weights, bodyweight, timed and cardio are only tags. What each set logs (weight, reps, time in
+  seconds or minutes, distance, in any mix) is chosen per exercise, so cardio can be counted in
+  reps.
+- More built-in exercises: jumping jacks, mountain climbers, push-up variants and other common
+  bodyweight moves.
+- Saved workouts can be planned ahead on their own screen, not only saved at the end of one.
+- A setting to keep the screen on while a workout is open.
+- Each set can have its own rest.
+- Several exercises can be grouped into a circuit (one set of each, then rest), in every
+  workout, not only with the training extras.
+- A workout left within its first minute is not kept **(default: only when nothing was ticked)**.
+- Sets counted in reps count toward the calories burned.
+- **Details (default):** keeping the screen on is off until turned on, in Settings → Workouts or
+  the workout's menu. A planned workout's numbers are used the first time; after that each
+  exercise fills in from last time, while its rests and warm-ups stay as planned.
+
 ## Calories burned
 
 - Estimated from logged workouts, using the body weight, and added to the day's calorie allowance.
 - **Details (default):** from standard activity values (METs) × body weight × time. Cardio uses
   its speed when a distance is given; weights and bodyweight use the workout's length. Added in
   full, with a Settings choice to count only half, because estimates tend to run high.
+- **Reps (default, 0.20.0):** the sets are also counted on their own: each ticked set's time, or
+  its reps × the seconds a rep takes (3 s, 1 to 2 s for quick moves like jumping jacks), at the
+  exercise's activity value. The larger of that and the workout-length estimate counts.
 
 ## Recipes
 

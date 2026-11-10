@@ -61,8 +61,10 @@ object Progression {
     fun hint(e: Exercise, last: List<WorkoutSet>?, unit: WeightUnit): Hint? {
         val working = last?.filter { !it.warmUp } ?: return null
         if (working.isEmpty() || working.any { !it.done }) return null
-        return when (e.kind) {
-            ExerciseKind.WEIGHTS -> {
+        val weighted = working.all { (it.weightKg ?: 0.0) > 0 } && Track.WEIGHT in e.tracks
+        val counted = working.all { (it.reps ?: 0) > 0 } && Track.REPS in e.tracks
+        return when {
+            weighted && counted -> {
                 val top = working.mapNotNull { it.weightKg }.maxOrNull() ?: return null
                 if (working.any { it.reps == null || it.reps <= 0 }) return null
                 val stepKg = if (unit == WeightUnit.KG) STEP_KG else STEP_LB * Units.KG_PER_LB
@@ -74,7 +76,7 @@ object Progression {
                     weightKg = next,
                 )
             }
-            ExerciseKind.BODYWEIGHT -> {
+            counted && Track.WEIGHT !in e.tracks -> {
                 val reps = working.mapNotNull { it.reps }
                 if (reps.size != working.size) return null
                 val most = reps.max()
@@ -106,6 +108,66 @@ object Supersets {
         var list = w.exercises.mapIndexed { i, e -> if (i == index) e.copy(superset = null) else e }
         if (list.count { it.superset == group } < 2) list = list.map { if (it.superset == group) it.copy(superset = null) else it }
         return w.copy(exercises = list)
+    }
+
+    /**
+     * Moves exercise [index] up (-1) or down (+1), past the next exercise or the next whole
+     * group. An exercise in a group moves with its whole group.
+     */
+    fun move(list: List<WorkoutExercise>, index: Int, by: Int): List<WorkoutExercise> {
+        if (index !in list.indices) return list
+        val blocks = mutableListOf<MutableList<WorkoutExercise>>()
+        for (e in list) {
+            val last = blocks.lastOrNull()
+            if (last != null && e.superset != null && last.first().superset == e.superset) last += e else blocks += mutableListOf(e)
+        }
+        var at = 0
+        var b = 0
+        while (at + blocks[b].size <= index) { at += blocks[b].size; b++ }
+        val to = b + (if (by < 0) -1 else 1)
+        if (to !in blocks.indices) return list
+        val x = blocks.removeAt(b)
+        blocks.add(to, x)
+        return tidy(blocks.flatten())
+    }
+
+    /** Groups split apart, or left with one exercise, end. */
+    fun tidy(list: List<WorkoutExercise>): List<WorkoutExercise> {
+        val ok = whole(list.map { it.superset })
+        return list.map { if (it.superset != null && it.superset !in ok) it.copy(superset = null) else it }
+    }
+
+    /** The same for a saved workout's exercises. */
+    fun tidyItems(list: List<SavedWorkoutItem>): List<SavedWorkoutItem> {
+        val ok = whole(list.map { it.superset })
+        return list.map { if (it.superset != null && it.superset !in ok) it.copy(superset = null) else it }
+    }
+
+    private fun whole(groups: List<Int?>): Set<Int> = groups.filterNotNull().toSet().filter { g ->
+        val at = groups.indices.filter { groups[it] == g }
+        at.size >= 2 && at.last() - at.first() == at.size - 1
+    }.toSet()
+
+    /** The groups of a saved workout's exercises, for planning ahead: like [joinWithNext] and [move]. */
+    fun joinItems(list: List<SavedWorkoutItem>, index: Int): List<SavedWorkoutItem> {
+        if (index !in 0 until list.lastIndex) return list
+        val g = list[index].superset ?: list[index + 1].superset ?: ((list.mapNotNull { it.superset }.maxOrNull() ?: 0) + 1)
+        return list.mapIndexed { i, e -> if (i == index || i == index + 1) e.copy(superset = g) else e }
+    }
+
+    fun leaveItems(list: List<SavedWorkoutItem>, index: Int): List<SavedWorkoutItem> =
+        tidyItems(list.mapIndexed { i, e -> if (i == index) e.copy(superset = null) else e }.let { l ->
+            // Taking one out of the middle splits the group: the later part becomes its own group.
+            val g = list.getOrNull(index)?.superset ?: return@let l
+            val next = (l.mapNotNull { it.superset }.maxOrNull() ?: 0) + 1
+            l.mapIndexed { i, e -> if (i > index && e.superset == g) e.copy(superset = next) else e }
+        })
+
+    fun moveItems(list: List<SavedWorkoutItem>, index: Int, by: Int): List<SavedWorkoutItem> {
+        // Moved as workout exercises, then back.
+        val asWorkout = list.map { WorkoutExercise(it.exercise, emptyList(), it.superset) }
+        val order = move(asWorkout.mapIndexed { i, e -> e.copy(sets = listOf(WorkoutSet(reps = i))) }, index, by)
+        return tidyItems(order.map { e -> list[e.sets.first().reps!!].copy(superset = e.superset) })
     }
 
     /**

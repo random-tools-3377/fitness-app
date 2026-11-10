@@ -12,6 +12,9 @@ import io.github.randomtools3377.fitness.core.Exercise
 import io.github.randomtools3377.fitness.core.ExerciseKind
 import io.github.randomtools3377.fitness.core.Exercises
 import io.github.randomtools3377.fitness.core.SavedWorkout
+import io.github.randomtools3377.fitness.core.SavedWorkoutItem
+import io.github.randomtools3377.fitness.core.Supersets
+import io.github.randomtools3377.fitness.core.Track
 import io.github.randomtools3377.fitness.core.UnitSettings
 import io.github.randomtools3377.fitness.core.Weight
 import io.github.randomtools3377.fitness.core.Workout
@@ -22,6 +25,7 @@ import io.github.randomtools3377.fitness.workout.RestTimer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -59,8 +63,32 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
 
     val saved: StateFlow<List<SavedWorkout>> = repo.savedWorkouts.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val exercises: StateFlow<List<Exercise>> = repo.ownExercises.map { Exercises.BUILT_IN + it }
+    /** What the user chose to log for each exercise (0.20.0). */
+    val tracks: StateFlow<Map<String, List<Track>>> = repo.settings.map { it.exerciseTracks }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    val exercises: StateFlow<List<Exercise>> = combine(repo.ownExercises, tracks) { own, t -> (Exercises.BUILT_IN + own).map { Exercises.withTrack(it, t) } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, Exercises.BUILT_IN)
+
+    /** Keep the screen on while a workout is open (0.20.0). */
+    val keepScreenOn: StateFlow<Boolean> = repo.settings.map { it.keepScreenOn }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setKeepScreenOn(on: Boolean) = viewModelScope.launch { repo.updateSettings { it.copy(keepScreenOn = on) } }
+
+    /**
+     * Changes what is logged for an exercise, from now on: in the workout in progress, in saved
+     * workouts when they next start, and wherever it is picked.
+     */
+    fun setTrack(e: Exercise, chosen: List<Track>) = viewModelScope.launch {
+        val t = Track.ordered(chosen)
+        if (t.isEmpty()) return@launch
+        val usual = t == Track.usual(e.kind)
+        repo.updateSettings { s -> s.copy(exerciseTracks = if (usual) s.exerciseTracks - e.key else s.exerciseTracks + (e.key to t)) }
+        change { w -> w.copy(exercises = w.exercises.map { we -> if (we.exercise.key == e.key) we.copy(exercise = we.exercise.copy(track = if (usual) null else t)) else we }) }
+    }
+
+    /** [e] as it is logged now. */
+    fun current(e: Exercise): Exercise = Exercises.withTrack(e.copy(track = null), tracks.value)
 
     val restTimes: StateFlow<Map<String, Int>> = repo.restTimes.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
@@ -96,11 +124,15 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun finishedBefore(): List<Workout> = workouts.value.filter { it.finished }
 
+    /** The sets of an exercise the last time it was done, for planning ahead. */
+    fun lastSets(key: String): List<WorkoutSet>? = Workouts.lastTime(key, finishedBefore())
+
     // Starting and ending.
 
     fun startEmpty() = start(Workout(name = "Workout", day = today(), startedAt = now()))
 
-    fun startSaved(sw: SavedWorkout) = start(Workouts.start(sw, finishedBefore(), today(), now()))
+    fun startSaved(sw: SavedWorkout) =
+        start(Workouts.start(sw.copy(items = sw.items.map { it.copy(exercise = current(it.exercise)) }), finishedBefore(), today(), now()))
 
     private fun start(w: Workout) = viewModelScope.launch {
         if (current.value != null) { message.value = "Finish the workout in progress first."; return@launch }
@@ -129,12 +161,23 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun discard() = viewModelScope.launch {
+    /**
+     * Leaving the workout screen (0.20.0): a workout left within its first minute with nothing
+     * ticked was most likely started by mistake, so it isn't kept.
+     */
+    fun leave() {
+        val w = current.value ?: return
+        if (now() - w.startedAt < 60_000 && w.exercises.none { we -> we.sets.any { it.done } }) {
+            discard("Not kept: it was under a minute, with nothing ticked")
+        }
+    }
+
+    fun discard(note: String = "Workout discarded") = viewModelScope.launch {
         val w = current.value ?: return@launch
         current.value = null
         RestTimer.stop(context)
         saveLock.withLock { repo.deleteWorkout(w.id) }
-        message.value = "Workout discarded"
+        message.value = note
     }
 
     fun rename(name: String) { if (name.isNotBlank()) change { it.copy(name = name.trim()) } }
@@ -184,13 +227,19 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         updateSet(index, setIndex) { doneSet }
         if (beaten.isNotEmpty()) celebration.value = beaten
         // In a superset, the rest comes after the last exercise of the round (0.9.0).
-        if (we.exercise.kind != ExerciseKind.CARDIO && io.github.randomtools3377.fitness.core.Supersets.restAfter(w, index)) {
-            RestTimer.start(context, restFor(we.exercise.key), we.exercise.name)
+        // Each set can have its own rest (0.20.0); long ones, logged in minutes, have none.
+        if (!we.exercise.long && Supersets.restAfter(w, index)) {
+            RestTimer.start(context, s.restSeconds ?: restFor(we.exercise.key), we.exercise.name)
         }
     }
 
     /** Marks a set as a warm-up, or back to a working set (0.9.0). */
     fun toggleWarmUp(index: Int, setIndex: Int) = updateSet(index, setIndex) { it.copy(warmUp = !it.warmUp) }
+
+    /** The rest after one set (0.20.0); null goes back to the exercise's rest. */
+    fun setSetRest(index: Int, setIndex: Int, seconds: Int?) = updateSet(index, setIndex) { it.copy(restSeconds = seconds?.coerceIn(0, 3600)) }
+
+    fun moveExercise(index: Int, by: Int) = change { w -> w.copy(exercises = Supersets.move(w.exercises, index, by)) }
 
     fun joinSuperset(index: Int) = change { w -> io.github.randomtools3377.fitness.core.Supersets.joinWithNext(w, index) }
 
@@ -235,9 +284,27 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         repo.setRest(key, seconds.coerceIn(5, 3600))
     }
 
-    suspend fun newExercise(name: String, kind: ExerciseKind): Exercise? {
+    suspend fun newExercise(name: String, kind: ExerciseKind, track: List<Track> = Track.usual(kind)): Exercise? {
         if (name.isBlank()) { message.value = "Give the exercise a name."; return null }
-        return repo.addExercise(name, kind)
+        val t = Track.ordered(track).ifEmpty { Track.usual(kind) }
+        val e = repo.addExercise(name, kind)
+        if (t == Track.usual(kind)) return e
+        repo.updateSettings { s -> s.copy(exerciseTracks = s.exerciseTracks + (e.key to t)) }
+        return e.copy(track = t)
+    }
+
+    /** Saves a workout planned ahead, new or changed (0.20.0). */
+    fun savePlanned(sw: SavedWorkout, done: () -> Unit) = viewModelScope.launch {
+        when {
+            sw.name.isBlank() -> message.value = "Give the workout a name."
+            sw.items.isEmpty() -> message.value = "Add an exercise first."
+            else -> {
+                val items = sw.items.map { it.copy(sets = it.plan.size.coerceAtLeast(1), exercise = it.exercise.copy(track = null)) }
+                repo.saveSavedWorkout(sw.copy(name = sw.name.trim(), items = Supersets.tidyItems(items), createdAt = if (sw.id == 0L) now() else sw.createdAt))
+                message.value = "Saved \"${sw.name.trim()}\""
+                done()
+            }
+        }
     }
 
     fun deleteExercise(e: Exercise) = viewModelScope.launch { repo.deleteExercise(e) }

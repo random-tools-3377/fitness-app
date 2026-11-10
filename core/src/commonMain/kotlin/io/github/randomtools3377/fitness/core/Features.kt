@@ -33,7 +33,7 @@ enum class Feature(
     CYCLE("Cycle tracking", "Period days, marked on the weight chart, and the next one estimated."),
     STEPS("Steps", "Your step count from Health Connect, adding to the day's calories."),
     CHECK_IN("Weekly check-in", "On Mondays, how your weight moved against the plan, with a suggested target."),
-    TRAINING_EXTRAS("Training extras", "A weekly programme, plate calculator, hints, supersets, warm-ups, notes and an interval timer."),
+    TRAINING_EXTRAS("Training extras", "A weekly programme, plate calculator, hints, warm-ups, notes and an interval timer."),
     OVERVIEW("Calendar and year in review", "A month at a glance, and each year's totals and bests."),
     AI_LABELS(
         "Better label reading",

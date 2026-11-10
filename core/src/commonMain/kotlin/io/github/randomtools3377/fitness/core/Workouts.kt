@@ -4,7 +4,10 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
-/** The four kinds of exercise. */
+/**
+ * The four tags an exercise can have (0.20.0: only a tag, shown in the list and used for the
+ * usual activity value; what is logged for it is its [Track]s, which the user chooses).
+ */
 @Serializable
 enum class ExerciseKind(val title: String) {
     /** Sets of reps with a weight. */
@@ -20,13 +23,44 @@ enum class ExerciseKind(val title: String) {
     CARDIO("Cardio"),
 }
 
+/** What can be logged for each set of an exercise (0.20.0). Times are kept in seconds either way. */
+@Serializable
+enum class Track(val title: String) {
+    WEIGHT("Weight"),
+    REPS("Reps"),
+    SECONDS("Time in seconds"),
+    MINUTES("Time in minutes"),
+    DISTANCE("Distance"),
+    ;
+
+    companion object {
+        /** What each tag logged before 0.20.0, and still logs until the user changes it. */
+        fun usual(kind: ExerciseKind): List<Track> = when (kind) {
+            ExerciseKind.WEIGHTS -> listOf(WEIGHT, REPS)
+            ExerciseKind.BODYWEIGHT -> listOf(REPS)
+            ExerciseKind.TIMED -> listOf(SECONDS)
+            ExerciseKind.CARDIO -> listOf(MINUTES, DISTANCE)
+        }
+
+        /** "WEIGHT,REPS", for the database. */
+        fun encode(t: List<Track>?): String? = t?.joinToString(",") { it.name }
+
+        fun decode(s: String?): List<Track>? = s?.split(',')?.mapNotNull { n -> entries.firstOrNull { it.name == n.trim() } }?.takeIf { it.isNotEmpty() }
+
+        /** In the usual order, so the boxes are always in the same places. */
+        fun ordered(t: Collection<Track>): List<Track> = entries.filter { it in t }
+    }
+}
+
 /** What kind of cardio, for working out its effort from its speed. */
 @Serializable
 enum class CardioType { RUN, WALK, CYCLE, OTHER }
 
 /**
  * An exercise: built in (with a [key] like "b:squat") or the user's own ("u:12"). [met] is its
- * standard activity value (MET), used for the calories it burns.
+ * standard activity value (MET), used for the calories it burns. [track] is what the user chose
+ * to log for it (null: the usual for its tag), and [secondsPerRep] how long one rep takes, for
+ * the calories of sets counted in reps.
  */
 @Serializable
 data class Exercise(
@@ -36,7 +70,15 @@ data class Exercise(
     val met: Double,
     val muscle: String = "",
     val cardio: CardioType = CardioType.OTHER,
-)
+    val track: List<Track>? = null,
+    val secondsPerRep: Double = Exercises.SECONDS_PER_REP,
+) {
+    /** What is logged for each set. */
+    val tracks: List<Track> get() = track?.takeIf { it.isNotEmpty() } ?: Track.usual(kind)
+
+    /** Logged in minutes, like a run: no rest timer after each set. */
+    val long: Boolean get() = Track.MINUTES in tracks
+}
 
 /**
  * Activity values (METs) from the Compendium of Physical Activities (Ainsworth and others), the
@@ -48,6 +90,9 @@ object Mets {
 
     /** Calisthenics (push-ups, sit-ups, pull-ups, lunges), moderate effort. */
     const val BODYWEIGHT = 3.8
+
+    /** Calisthenics (push-ups, sit-ups, pull-ups, jumping jacks), vigorous effort. */
+    const val VIGOROUS = 8.0
 
     /** Running at a speed in km/h, from the Compendium's running speeds. */
     fun running(kmh: Double): Double = byMph(kmh, RUN)
@@ -79,9 +124,14 @@ object Mets {
 /** The built-in list of common exercises. */
 object Exercises {
     private fun w(id: String, name: String, muscle: String) = Exercise("b:$id", name, ExerciseKind.WEIGHTS, Mets.WEIGHTS, muscle)
-    private fun b(id: String, name: String, muscle: String) = Exercise("b:$id", name, ExerciseKind.BODYWEIGHT, Mets.BODYWEIGHT, muscle)
+    private fun b(id: String, name: String, muscle: String, met: Double = Mets.BODYWEIGHT, perRep: Double = SECONDS_PER_REP) =
+        Exercise("b:$id", name, ExerciseKind.BODYWEIGHT, met, muscle, secondsPerRep = perRep)
     private fun t(id: String, name: String, muscle: String, met: Double = Mets.BODYWEIGHT) = Exercise("b:$id", name, ExerciseKind.TIMED, met, muscle)
     private fun c(id: String, name: String, met: Double, type: CardioType = CardioType.OTHER) = Exercise("b:$id", name, ExerciseKind.CARDIO, met, "Cardio", type)
+
+    /** Quick cardio moves, counted in reps or seconds (0.20.0). */
+    private fun q(id: String, name: String, track: Track, perRep: Double = 1.0) =
+        Exercise("b:$id", name, ExerciseKind.CARDIO, Mets.VIGOROUS, "Cardio", track = listOf(track), secondsPerRep = perRep)
 
     val BUILT_IN: List<Exercise> = listOf(
         w("squat", "Squat", "Legs"),
@@ -110,6 +160,12 @@ object Exercises {
         w("triceps-pushdown", "Triceps pushdown", "Arms"),
         w("skull-crusher", "Skull crusher", "Arms"),
         w("kettlebell-swing", "Kettlebell swing", "Full body"),
+        w("goblet-squat", "Goblet squat", "Legs"),
+        w("bulgarian-split-squat", "Bulgarian split squat", "Legs"),
+        w("sumo-deadlift", "Sumo deadlift", "Legs"),
+        w("shrug", "Shrug", "Shoulders"),
+        w("arnold-press", "Arnold press", "Shoulders"),
+        w("overhead-triceps-extension", "Overhead triceps extension", "Arms"),
         b("push-up", "Push-up", "Chest"),
         b("pull-up", "Pull-up", "Back"),
         b("chin-up", "Chin-up", "Back"),
@@ -119,12 +175,49 @@ object Exercises {
         b("sit-up", "Sit-up", "Core"),
         b("crunch", "Crunch", "Core"),
         b("leg-raise", "Hanging leg raise", "Core"),
-        b("burpee", "Burpee", "Full body"),
+        b("burpee", "Burpee", "Full body", met = Mets.VIGOROUS, perRep = 4.0),
         b("glute-bridge", "Glute bridge", "Legs"),
+        // 0.20.0: more bodyweight moves.
+        b("knee-push-up", "Knee push-up", "Chest"),
+        b("incline-push-up", "Incline push-up", "Chest"),
+        b("decline-push-up", "Decline push-up", "Chest"),
+        b("wide-push-up", "Wide push-up", "Chest"),
+        b("diamond-push-up", "Diamond push-up", "Arms"),
+        b("pike-push-up", "Pike push-up", "Shoulders"),
+        b("archer-push-up", "Archer push-up", "Chest"),
+        b("wall-push-up", "Wall push-up", "Chest"),
+        b("bench-dip", "Bench dip", "Arms"),
+        b("inverted-row", "Inverted row", "Back"),
+        b("superman", "Superman", "Back"),
+        b("back-extension", "Back extension", "Back"),
+        b("jump-squat", "Jump squat", "Legs", met = Mets.VIGOROUS, perRep = 2.0),
+        b("jump-lunge", "Jump lunge", "Legs", met = Mets.VIGOROUS, perRep = 2.0),
+        b("box-jump", "Box jump", "Legs", met = Mets.VIGOROUS),
+        b("step-up", "Step-up", "Legs"),
+        b("side-lunge", "Side lunge", "Legs"),
+        b("bodyweight-calf-raise", "Calf raise (bodyweight)", "Legs", perRep = 2.0),
+        b("single-leg-glute-bridge", "Single-leg glute bridge", "Legs"),
+        b("lying-leg-raise", "Lying leg raise", "Core"),
+        b("bicycle-crunch", "Bicycle crunch", "Core", perRep = 2.0),
+        b("russian-twist", "Russian twist", "Core", perRep = 2.0),
+        b("v-up", "V-up", "Core"),
+        b("dead-bug", "Dead bug", "Core"),
+        b("bird-dog", "Bird dog", "Core"),
+        b("shoulder-tap", "Plank shoulder tap", "Core", perRep = 2.0),
         t("plank", "Plank", "Core"),
         t("side-plank", "Side plank", "Core"),
         t("wall-sit", "Wall sit", "Legs"),
         t("dead-hang", "Dead hang", "Back"),
+        t("hollow-hold", "Hollow hold", "Core"),
+        t("l-sit", "L-sit", "Core"),
+        t("flutter-kicks", "Flutter kicks", "Core"),
+        q("jumping-jacks", "Jumping jacks", Track.REPS),
+        q("mountain-climbers", "Mountain climbers", Track.REPS),
+        q("high-knees", "High knees", Track.SECONDS),
+        q("butt-kicks", "Butt kicks", Track.SECONDS),
+        q("skater-jumps", "Skater jumps", Track.REPS, perRep = 1.5),
+        q("tuck-jumps", "Tuck jumps", Track.REPS, perRep = 2.0),
+        q("bear-crawl", "Bear crawl", Track.SECONDS),
         t("jump-rope", "Jump rope", "Cardio", met = 11.8),
         c("run", "Running", 8.0, CardioType.RUN),
         c("treadmill", "Treadmill run", 8.0, CardioType.RUN),
@@ -164,6 +257,12 @@ object Exercises {
     }
 
     const val DEFAULT_REST_SECONDS = 90
+
+    /** How long one rep takes, for the calories of sets counted in reps (0.20.0). */
+    const val SECONDS_PER_REP = 3.0
+
+    /** [e] with what the user chose to log for it, if they changed it. */
+    fun withTrack(e: Exercise, chosen: Map<String, List<Track>>): Exercise = chosen[e.key]?.let { e.copy(track = it) } ?: e
 }
 
 /**
@@ -181,6 +280,8 @@ data class WorkoutSet(
     val doneAt: Long? = null,
     /** A warm-up set (0.9.0): in neither personal bests nor the total lifted. */
     val warmUp: Boolean = false,
+    /** The rest after this set, if it has its own (0.20.0); otherwise the exercise's. */
+    val restSeconds: Int? = null,
 )
 
 /** An exercise as done in one workout: its sets in order. */
@@ -222,8 +323,20 @@ data class SavedWorkout(
     val createdAt: Long = 0,
 )
 
+/**
+ * One exercise of a saved workout. [plan] is each set as planned (0.20.0): its numbers, used when
+ * the exercise hasn't been done before, and its rest and warm-up mark, used every time.
+ */
 @Serializable
-data class SavedWorkoutItem(val exercise: Exercise, val sets: Int, val superset: Int? = null)
+data class SavedWorkoutItem(
+    val exercise: Exercise,
+    val sets: Int,
+    val superset: Int? = null,
+    val plan: List<WorkoutSet> = emptyList(),
+) {
+    /** The sets as planned, as many as [sets]. */
+    fun planned(): List<WorkoutSet> = (0 until maxOf(sets, plan.size, 1)).map { plan.getOrNull(it) ?: plan.lastOrNull()?.copy(warmUp = false) ?: WorkoutSet() }
+}
 
 object Workouts {
     /**
@@ -237,9 +350,17 @@ object Workouts {
         savedWorkoutId = saved.id,
         exercises = saved.items.map { item ->
             val last = lastTime(item.exercise.key, history)
-            val sets = (0 until item.sets.coerceAtLeast(1)).map { i ->
+            val hasPlan = item.plan.isNotEmpty()
+            val sets = item.planned().mapIndexed { i, p ->
                 val from = last?.getOrNull(i) ?: last?.lastOrNull()
-                from?.copy(done = false, doneAt = null) ?: WorkoutSet()
+                if (from == null) p.copy(done = false, doneAt = null)
+                else from.copy(
+                    done = false, doneAt = null,
+                    weightKg = from.weightKg ?: p.weightKg, reps = from.reps ?: p.reps,
+                    seconds = from.seconds ?: p.seconds, distanceKm = from.distanceKm ?: p.distanceKm,
+                    warmUp = if (hasPlan) p.warmUp else from.warmUp,
+                    restSeconds = if (hasPlan) p.restSeconds else from.restSeconds,
+                )
             }
             WorkoutExercise(item.exercise, sets, item.superset)
         },
@@ -263,17 +384,30 @@ object Workouts {
         require(w.exercises.isNotEmpty()) { "There are no exercises to save." }
         return SavedWorkout(
             name = name.trim(),
-            items = w.exercises.map { SavedWorkoutItem(it.exercise, it.sets.size.coerceAtLeast(1), it.superset) },
+            items = w.exercises.map { we ->
+                SavedWorkoutItem(we.exercise, we.sets.size.coerceAtLeast(1), we.superset, we.sets.map { it.copy(done = false, doneAt = null) })
+            },
             createdAt = now,
         )
     }
 
-    /** "3 × 80 kg × 5", "45 s", "5 km in 28:30". */
-    fun describe(set: WorkoutSet, kind: ExerciseKind, u: UnitSettings): String = when (kind) {
-        ExerciseKind.WEIGHTS -> "${set.weightKg?.let { Units.weight(it, u.weight) } ?: "—"} × ${set.reps ?: "—"}"
-        ExerciseKind.BODYWEIGHT -> "${set.reps ?: "—"} reps"
-        ExerciseKind.TIMED -> clock(set.seconds ?: 0)
-        ExerciseKind.CARDIO -> (set.distanceKm?.let { Units.distance(it, u.distance) + " in " } ?: "") + clock(set.seconds ?: 0)
+    /** "80 kg × 5", "20 reps", "1:15", "5 km in 28:30": whatever the set has. */
+    fun describe(set: WorkoutSet, u: UnitSettings): String {
+        val bits = mutableListOf<String>()
+        val kg = set.weightKg?.takeIf { it > 0 }?.let { Units.weight(it, u.weight) }
+        val reps = set.reps?.takeIf { it > 0 }
+        when {
+            kg != null && reps != null -> bits += "$kg × $reps"
+            kg != null -> bits += kg
+            reps != null -> bits += "$reps ${if (reps == 1) "rep" else "reps"}"
+        }
+        val time = set.seconds?.takeIf { it > 0 }?.let { clock(it) }
+        val km = set.distanceKm?.takeIf { it > 0 }?.let { Units.distance(it, u.distance) }
+        when {
+            km != null -> bits += km + (time?.let { " in $it" } ?: "")
+            time != null -> bits += time
+        }
+        return bits.joinToString(", ").ifEmpty { "—" }
     }
 
     /** 75 → "1:15", 3725 → "1:02:05". */
@@ -286,9 +420,12 @@ object Workouts {
 }
 
 /**
- * Calories burned, from standard activity values: MET × body weight (kg) × hours. Weights,
- * bodyweight and timed exercises use the workout's length; cardio uses its own time, and its
- * speed when a distance is given.
+ * Calories burned, from standard activity values: MET × body weight (kg) × hours. Two estimates,
+ * and the larger counts (0.20.0):
+ * - by the workout's length: cardio timed in its sets uses its own time (and its speed when a
+ *   distance is given); the rest of the workout's length counts at the hardest other exercise;
+ * - by the sets themselves: each ticked set's own time, or its reps × the seconds a rep takes,
+ *   so 120 push-ups count as the work they are even when typed in after a few seconds.
  */
 object Burned {
     fun cardioMet(e: Exercise, set: WorkoutSet): Double {
@@ -304,25 +441,42 @@ object Burned {
         }
     }
 
+    /** How long a ticked set took: its own time, or its reps at the exercise's pace. */
+    fun activeSeconds(e: Exercise, s: WorkoutSet): Double =
+        s.seconds?.takeIf { it > 0 }?.toDouble() ?: s.reps?.takeIf { it > 0 }?.let { it * e.secondsPerRep } ?: 0.0
+
+    private fun timedCardio(e: Exercise, s: WorkoutSet) = e.kind == ExerciseKind.CARDIO && (s.seconds ?: 0) > 0
+
     /** kcal for [w] at [weightKg]. [half] counts only half, because estimates tend to run high. */
     fun workout(w: Workout, weightKg: Double, now: Long = w.endedAt ?: w.startedAt, half: Boolean = false): Double {
+        val kcal = maxOf(byLength(w, weightKg, now), bySets(w, weightKg))
+        return if (half) kcal / 2 else kcal
+    }
+
+    /** By the workout's length. */
+    fun byLength(w: Workout, weightKg: Double, now: Long = w.endedAt ?: w.startedAt): Double {
         var kcal = 0.0
         var cardioMinutes = 0.0
-        for (we in w.exercises.filter { it.exercise.kind == ExerciseKind.CARDIO }) {
-            for (s in we.sets.filter { it.done }) {
-                val sec = s.seconds ?: 0
-                kcal += cardioMet(we.exercise, s) * weightKg * sec / 3600.0
-                cardioMinutes += sec / 60.0
-            }
+        for (we in w.exercises) for (s in we.sets.filter { it.done && timedCardio(we.exercise, it) }) {
+            val sec = s.seconds ?: 0
+            kcal += cardioMet(we.exercise, s) * weightKg * sec / 3600.0
+            cardioMinutes += sec / 60.0
         }
-        val strength = w.exercises.filter { it.exercise.kind != ExerciseKind.CARDIO && it.sets.any { s -> s.done } }
-        if (strength.isNotEmpty()) {
-            // The workout's length, less any time spent on cardio in it, at the hardest of its strength exercises.
+        val rest = w.exercises.filter { we -> we.sets.any { it.done && !timedCardio(we.exercise, it) } }
+        if (rest.isNotEmpty()) {
+            // The workout's length, less any time spent on timed cardio in it, at the hardest of the other exercises.
             val minutes = (w.minutes(now) - cardioMinutes).coerceAtLeast(0.0)
-            val met = strength.maxOf { it.exercise.met }
-            kcal += met * weightKg * minutes / 60.0
+            kcal += rest.maxOf { it.exercise.met } * weightKg * minutes / 60.0
         }
-        return if (half) kcal / 2 else kcal
+        return kcal
+    }
+
+    /** By the ticked sets themselves. */
+    fun bySets(w: Workout, weightKg: Double): Double = w.exercises.sumOf { we ->
+        we.sets.filter { it.done }.sumOf { s ->
+            val met = if (we.exercise.kind == ExerciseKind.CARDIO) cardioMet(we.exercise, s) else we.exercise.met
+            met * weightKg * activeSeconds(we.exercise, s) / 3600.0
+        }
     }
 
     /** A rough estimate, so to the nearest whole kcal. */

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -72,6 +73,7 @@ import io.github.randomtools3377.fitness.core.Exercises
 import io.github.randomtools3377.fitness.core.SavedWorkout
 import io.github.randomtools3377.fitness.core.UnitSettings
 import io.github.randomtools3377.fitness.core.Units
+import io.github.randomtools3377.fitness.core.Track
 import io.github.randomtools3377.fitness.core.Workout
 import io.github.randomtools3377.fitness.core.WorkoutSet
 import io.github.randomtools3377.fitness.core.Workouts
@@ -147,6 +149,11 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
                     OutlinedButton(onClick = { cardio = true }, modifier = Modifier.testTag("log-cardio")) { Text("Log cardio") }
                 }
             }
+            item {
+                TextButton(onClick = { open(Route.PlanWorkout()) }, modifier = Modifier.padding(horizontal = 8.dp).testTag("plan-workout")) {
+                    Text("+ Plan a workout ahead")
+                }
+            }
         }
         item {
             Row(Modifier.padding(horizontal = 8.dp)) {
@@ -158,7 +165,7 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
         if (saved.isEmpty()) {
             item {
                 Text(
-                    "None yet. When you finish a workout, give it a name to save it, like \"Leg day\". Next time it fills in each exercise from last time.",
+                    "None yet. Plan one ahead with \"Plan a workout ahead\", or give a workout a name when you finish it, like \"Leg day\". Next time it fills in each exercise from last time.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
@@ -175,6 +182,7 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
                     Text(sw.items.joinToString(" · ") { "${it.exercise.name} ${it.sets}×" }, style = MaterialTheme.typography.bodySmall)
                 }
                 var confirm by remember { mutableStateOf(false) }
+                IconButton(onClick = { open(Route.PlanWorkout(sw.id)) }, modifier = Modifier.testTag("edit:${sw.name}")) { Icon(Icons.Filled.Edit, contentDescription = "Change") }
                 IconButton(onClick = { confirm = true }) { Icon(Icons.Filled.Delete, contentDescription = "Delete") }
                 if (confirm) {
                     ConfirmDialog("Delete ${sw.name}?", "Workouts already done stay in the history.", "Delete", { wvm.deleteSaved(sw); confirm = false }, { confirm = false })
@@ -204,7 +212,7 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
 
     if (cardio) {
         LogCardioDialog(
-            exercises = exercises.filter { it.kind == ExerciseKind.CARDIO },
+            exercises = exercises.filter { it.kind == ExerciseKind.CARDIO && (Track.MINUTES in it.tracks || Track.DISTANCE in it.tracks) },
             units = units,
             onLog = { e, minutes, km -> wvm.logCardio(e, minutes, km, vm.day.value); cardio = false },
             onDismiss = { cardio = false },
@@ -216,8 +224,8 @@ fun WorkoutsScreen(wvm: WorkoutViewModel, vm: MainViewModel, modifier: Modifier,
 
 private fun summary(w: Workout, u: UnitSettings): String {
     val sets = w.exercises.sumOf { it.sets.count { s -> s.done } }
-    val cardio = w.exercises.singleOrNull()?.takeIf { it.exercise.kind == ExerciseKind.CARDIO }?.sets?.firstOrNull()
-    return if (cardio != null) Workouts.describe(cardio, ExerciseKind.CARDIO, u)
+    val cardio = w.exercises.singleOrNull()?.takeIf { it.exercise.kind == ExerciseKind.CARDIO && it.sets.size == 1 && it.exercise.long }?.sets?.firstOrNull()
+    return if (cardio != null) Workouts.describe(cardio, u)
     else "${w.minutes().toInt()} min · $sets ${if (sets == 1) "set" else "sets"}"
 }
 
@@ -235,7 +243,7 @@ private fun WorkoutDetailsDialog(w: Workout, units: UnitSettings, wvm: WorkoutVi
                 Text("${summary(w, units)}${if (w.burnedKcal > 0) " · about " + energy(w.burnedKcal, units) + " burned" else ""}", style = MaterialTheme.typography.bodySmall)
                 for (we in w.exercises) {
                     Text(we.exercise.name, style = MaterialTheme.typography.titleSmall)
-                    Text(we.sets.filter { it.done }.joinToString("\n") { Workouts.describe(it, we.exercise.kind, units) }, style = MaterialTheme.typography.bodySmall)
+                    Text(we.sets.filter { it.done }.joinToString("\n") { Workouts.describe(it, units) }, style = MaterialTheme.typography.bodySmall)
                 }
                 HorizontalDivider()
                 TextInput(name, { name = it }, "Save as a workout, named", "field:save-as")
@@ -297,8 +305,20 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     var restFor by remember { mutableStateOf<Exercise?>(null) }
     var platesFor by remember { mutableStateOf<Int?>(null) }
     var noting by remember { mutableStateOf<Exercise?>(null) }
+    var tracking by remember { mutableStateOf<Exercise?>(null) }
+    var restSet by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val extras = on(io.github.randomtools3377.fitness.core.Feature.TRAINING_EXTRAS)
     val notes by wvm.notes.collectAsState()
+    val keepOn by wvm.keepScreenOn.collectAsState()
+    // Leaving: a workout under a minute with nothing ticked isn't kept (0.20.0).
+    val leave = { wvm.leave(); back() }
+    androidx.activity.compose.BackHandler { leave() }
+    // Keep the screen on while the workout is open, if chosen (0.20.0).
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(keepOn) {
+        view.keepScreenOn = keepOn
+        onDispose { view.keepScreenOn = false }
+    }
     // Bumped when a hint fills in the sets, so their boxes show the new numbers.
     var refills by remember { mutableStateOf(0) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -327,7 +347,7 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
         TopAppBar(
             title = { Text(w.name, modifier = Modifier.clickable { renaming = true }.testTag("workout-name")) },
             navigationIcon = {
-                IconButton(onClick = back, modifier = Modifier.testTag("back")) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                IconButton(onClick = leave, modifier = Modifier.testTag("back")) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
             },
             actions = {
                 Text(Workouts.clock(((now - w.startedAt) / 1000).toInt().coerceAtLeast(0)), style = MaterialTheme.typography.bodyMedium)
@@ -336,6 +356,11 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                     IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
+                        DropdownMenuItem(
+                            text = { Text(if (keepOn) "✓ Keep the screen on" else "Keep the screen on") },
+                            onClick = { menu = false; wvm.setKeepScreenOn(!keepOn) },
+                            modifier = Modifier.testTag("toggle-screen-on"),
+                        )
                         DropdownMenuItem(text = { Text("Discard this workout") }, onClick = { menu = false; discarding = true }, modifier = Modifier.testTag("discard-workout"))
                     }
                 }
@@ -355,21 +380,21 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                                 color = if (note == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.clickable { noting = we.exercise }.testTag("note:$i"),
                             )
-                            if (we.exercise.kind != ExerciseKind.CARDIO) {
+                            if (!we.exercise.long) {
                                 Text(
-                                    "Rest ${Workouts.clock(restTimes[we.exercise.key] ?: Exercises.DEFAULT_REST_SECONDS)}",
+                                    "Rest ${Workouts.clock(restTimes[we.exercise.key] ?: Exercises.DEFAULT_REST_SECONDS)} between sets",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.clickable { restFor = we.exercise }.testTag("rest:$i"),
                                 )
                             }
                         }
-                        if (extras) ExerciseMenu(w, i, we, wvm, onPlates = { platesFor = i })
+                        ExerciseMenu(w, i, we, wvm, extras, onPlates = { platesFor = i }, onTrack = { tracking = we.exercise })
                         IconButton(onClick = { wvm.removeExercise(i) }) { Icon(Icons.Filled.Close, contentDescription = "Remove exercise") }
                     }
                     we.superset?.let { g ->
                         Text(
-                            "Superset ${('A' + (g - 1) % 26)}: do one set of each in turn, then rest",
+                            "Circuit ${('A' + (g - 1) % 26)}: one set of each in turn, then rest",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.testTag("superset:$i"),
@@ -385,8 +410,11 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                             }
                         }
                     }
-                    SetHeader(we.exercise.kind, units)
-                    we.sets.forEachIndexed { j, s -> SetRow(w.id, i, j, we.exercise.kind, s, units, wvm, "${w.exercises.size}:${we.sets.size}:$refills") }
+                    val tracks = we.exercise.tracks
+                    SetHeader(tracks, units)
+                    we.sets.forEachIndexed { j, s ->
+                        SetRow(w.id, i, j, tracks, s, units, wvm, "${w.exercises.size}:${we.sets.size}:$refills:$tracks", extras, rests = !we.exercise.long, onRest = { restSet = i to j })
+                    }
                     TextButton(onClick = { wvm.addSet(i) }, modifier = Modifier.testTag("add-set:$i")) { Text("+ Add a set") }
                 }
             }
@@ -401,6 +429,16 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     }
 
     if (picking) ExercisePicker(wvm, onPick = { wvm.addExercise(it); picking = false }, onDismiss = { picking = false })
+    tracking?.let { e ->
+        TrackDialog(e, onSave = { wvm.setTrack(e, it); tracking = null; refills++ }, onDismiss = { tracking = null })
+    }
+    restSet?.let { (i, j) ->
+        val we = w.exercises.getOrNull(i)
+        val s = we?.sets?.getOrNull(j)
+        if (we == null || s == null) { restSet = null; return@let }
+        val usual = restTimes[we.exercise.key] ?: Exercises.DEFAULT_REST_SECONDS
+        SetRestDialog(we.exercise.name, j, s.restSeconds, usual, onSave = { wvm.setSetRest(i, j, it); restSet = null }, onDismiss = { restSet = null })
+    }
     if (finishing) {
         var name by remember { mutableStateOf("") }
         val fromSaved = w.savedWorkoutId != null
@@ -481,18 +519,46 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     }
 }
 
+/** The column title for each thing logged. */
+fun trackColumn(t: Track, units: UnitSettings): String = when (t) {
+    Track.WEIGHT -> units.weight.short
+    Track.REPS -> "reps"
+    Track.SECONDS -> "seconds"
+    Track.MINUTES -> "minutes"
+    Track.DISTANCE -> units.distance.short
+}
+
 @Composable
-private fun SetHeader(kind: ExerciseKind, units: UnitSettings) {
-    val cols = when (kind) {
-        ExerciseKind.WEIGHTS -> listOf(units.weight.short, "reps")
-        ExerciseKind.BODYWEIGHT -> listOf("reps")
-        ExerciseKind.TIMED -> listOf("seconds")
-        ExerciseKind.CARDIO -> listOf("minutes", units.distance.short)
-    }
+fun SetHeader(tracks: List<Track>, units: UnitSettings, end: androidx.compose.ui.unit.Dp = 88.dp) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("SET", Modifier.width(36.dp), style = MaterialTheme.typography.labelSmall)
-        for (c in cols) Text(c.uppercase(), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
-        Spacer(Modifier.width(88.dp))
+        for (c in tracks) Text(trackColumn(c, units).uppercase(), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
+        Spacer(Modifier.width(end))
+    }
+}
+
+/** The number boxes of one set, one for each thing logged (0.20.0). [tag] is "$i:$j". */
+@Composable
+fun androidx.compose.foundation.layout.RowScope.SetBoxes(
+    tracks: List<Track>,
+    s: WorkoutSet,
+    units: UnitSettings,
+    key: String,
+    tag: String,
+    update: ((WorkoutSet) -> WorkoutSet) -> Unit,
+) {
+    for (t in tracks) when (t) {
+        Track.WEIGHT -> SetField(s.weightKg?.let { formatAmount(Units.kgToShown(it, units.weight)) } ?: "", "field:weight:$tag", "$key:w", true, Modifier.weight(1f)) { x ->
+            update { it.copy(weightKg = Units.parse(x)?.let { v -> Units.shownToKg(v, units.weight) }) }
+        }
+        Track.REPS -> SetField(s.reps?.toString() ?: "", "field:reps:$tag", "$key:reps", false, Modifier.weight(1f)) { x -> update { it.copy(reps = x.toIntOrNull()) } }
+        Track.SECONDS -> SetField(s.seconds?.toString() ?: "", "field:seconds:$tag", "$key:seconds", false, Modifier.weight(1f)) { x -> update { it.copy(seconds = x.toIntOrNull()) } }
+        Track.MINUTES -> SetField(s.seconds?.let { formatAmount(Math.round(it / 6.0) / 10.0) } ?: "", "field:minutes:$tag", "$key:minutes", true, Modifier.weight(1f)) { x ->
+            update { it.copy(seconds = Units.parse(x)?.let { m -> (m * 60).toInt() }) }
+        }
+        Track.DISTANCE -> SetField(s.distanceKm?.let { formatAmount(Units.kmToShown(it, units.distance)) } ?: "", "field:distance:$tag", "$key:distance", true, Modifier.weight(1f)) { x ->
+            update { it.copy(distanceKm = Units.parse(x)?.let { d -> Units.shownToKm(d, units.distance) }) }
+        }
     }
 }
 
@@ -511,39 +577,112 @@ private fun SetField(initial: String, tag: String, stateKey: String, decimals: B
 }
 
 @Composable
-private fun SetRow(workoutId: Long, i: Int, j: Int, kind: ExerciseKind, s: WorkoutSet, units: UnitSettings, wvm: WorkoutViewModel, shape: String) {
+private fun SetRow(
+    workoutId: Long, i: Int, j: Int, tracks: List<Track>, s: WorkoutSet, units: UnitSettings, wvm: WorkoutViewModel, shape: String,
+    extras: Boolean, rests: Boolean, onRest: () -> Unit,
+) {
     // Changes when sets or exercises are added or removed, so the boxes are filled in afresh.
     val key = "$workoutId:$i:$j:$shape"
+    var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        // Tap the number to mark a warm-up set (0.9.0), shown as W.
-        Text(
-            if (s.warmUp) "W" else "${j + 1}",
-            Modifier.width(36.dp).clickable(enabled = on(io.github.randomtools3377.fitness.core.Feature.TRAINING_EXTRAS)) { wvm.toggleWarmUp(i, j) }.testTag("warmup:$i:$j"),
-            color = if (s.done) MaterialTheme.colorScheme.outline else if (s.warmUp) MaterialTheme.colorScheme.tertiary else Color.Unspecified,
-        )
-        when (kind) {
-            ExerciseKind.WEIGHTS -> {
-                SetField(s.weightKg?.let { formatAmount(Units.kgToShown(it, units.weight)) } ?: "", "field:weight:$i:$j", "$key:w", true, Modifier.weight(1f)) { t ->
-                    wvm.updateSet(i, j) { it.copy(weightKg = Units.parse(t)?.let { x -> Units.shownToKg(x, units.weight) }) }
-                }
-                SetField(s.reps?.toString() ?: "", "field:reps:$i:$j", "$key:reps", false, Modifier.weight(1f)) { t -> wvm.updateSet(i, j) { it.copy(reps = t.toIntOrNull()) } }
-            }
-            ExerciseKind.BODYWEIGHT -> SetField(s.reps?.toString() ?: "", "field:reps:$i:$j", "$key:reps", false, Modifier.weight(1f)) { t -> wvm.updateSet(i, j) { it.copy(reps = t.toIntOrNull()) } }
-            ExerciseKind.TIMED -> SetField(s.seconds?.toString() ?: "", "field:seconds:$i:$j", "$key:seconds", false, Modifier.weight(1f)) { t -> wvm.updateSet(i, j) { it.copy(seconds = t.toIntOrNull()) } }
-            ExerciseKind.CARDIO -> {
-                SetField(s.seconds?.let { formatAmount(it / 60.0) } ?: "", "field:minutes:$i:$j", "$key:minutes", true, Modifier.weight(1f)) { t ->
-                    wvm.updateSet(i, j) { it.copy(seconds = Units.parse(t)?.let { m -> (m * 60).toInt() }) }
-                }
-                SetField(s.distanceKm?.let { formatAmount(Units.kmToShown(it, units.distance)) } ?: "", "field:distance:$i:$j", "$key:distance", true, Modifier.weight(1f)) { t ->
-                    wvm.updateSet(i, j) { it.copy(distanceKm = Units.parse(t)?.let { d -> Units.shownToKm(d, units.distance) }) }
-                }
+        // The set's number opens its menu: its own rest (0.20.0), and marking a warm-up (0.9.0), shown as W.
+        Box(Modifier.width(36.dp)) {
+            Text(
+                if (s.warmUp) "W" else "${j + 1}",
+                Modifier.clickable(enabled = rests || extras) { menu = true }.padding(vertical = 12.dp).testTag("warmup:$i:$j"),
+                color = if (s.done) MaterialTheme.colorScheme.outline else if (s.warmUp) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
+            )
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                if (rests) DropdownMenuItem(
+                    text = { Text("Rest after this set" + (s.restSeconds?.let { ": " + Workouts.clock(it) } ?: "…")) },
+                    onClick = { menu = false; onRest() },
+                    modifier = Modifier.testTag("set-rest:$i:$j"),
+                )
+                if (extras) DropdownMenuItem(
+                    text = { Text(if (s.warmUp) "Make it a working set" else "Make it a warm-up set") },
+                    onClick = { menu = false; wvm.toggleWarmUp(i, j) },
+                    modifier = Modifier.testTag("make-warmup:$i:$j"),
+                )
             }
         }
+        SetBoxes(tracks, s, units, key, "$i:$j") { f -> wvm.updateSet(i, j, f) }
         FilledIconToggleButton(checked = s.done, onCheckedChange = { wvm.tick(i, j) }, modifier = Modifier.testTag("tick:$i:$j")) {
             Icon(Icons.Filled.Check, contentDescription = if (s.done) "Done" else "Tick when done")
         }
         IconButton(onClick = { wvm.removeSet(i, j) }) { Icon(Icons.Filled.Close, contentDescription = "Remove set") }
     }
+    s.restSeconds?.takeIf { rests }?.let {
+        Text("Then rest ${Workouts.clock(it)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 36.dp).testTag("set-rest-shown:$i:$j"))
+    }
+}
+
+/** The rest after one set (0.20.0): its own, or back to the exercise's. */
+@Composable
+fun SetRestDialog(name: String, j: Int, own: Int?, usual: Int, onSave: (Int?) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf((own ?: usual).toString()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rest after set ${j + 1}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(name, style = MaterialTheme.typography.bodySmall)
+                NumberField(text, { text = it }, "Seconds", "field:set-rest", Modifier.fillMaxWidth(), suffix = "s", decimals = false)
+                Text("The other sets keep the exercise's rest (${Workouts.clock(usual)}). 0 means no rest.", style = MaterialTheme.typography.bodySmall)
+                if (own != null) TextButton(onClick = { onSave(null) }, modifier = Modifier.testTag("set-rest-usual")) { Text("Use the exercise's rest") }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(text.toIntOrNull()) }, enabled = (text.toIntOrNull() ?: -1) in 0..3600, modifier = Modifier.testTag("save-set-rest")) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Choosing what is logged for each set of an exercise (0.20.0). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun TrackChips(chosen: List<Track>, onChange: (List<Track>) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (t in Track.entries) {
+            androidx.compose.material3.FilterChip(
+                selected = t in chosen,
+                onClick = {
+                    val next = if (t in chosen) chosen - t else {
+                        // One kind of time at once.
+                        val other = when (t) { Track.SECONDS -> Track.MINUTES; Track.MINUTES -> Track.SECONDS; else -> null }
+                        chosen - setOfNotNull(other) + t
+                    }
+                    onChange(Track.ordered(next))
+                },
+                label = { Text(t.title) },
+                modifier = Modifier.testTag("track:${t.name}"),
+            )
+        }
+    }
+}
+
+@Composable
+fun TrackDialog(e: Exercise, onSave: (List<Track>) -> Unit, onDismiss: () -> Unit) {
+    var chosen by remember(e.key) { mutableStateOf(e.tracks) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("What to log for ${e.name}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TrackChips(chosen) { chosen = it }
+                Text(
+                    "Pick any mix, like reps for cardio. It's kept for this exercise from now on. Its tag (${e.kind.title}) stays as it is.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (chosen != Track.usual(e.kind)) {
+                    TextButton(onClick = { chosen = Track.usual(e.kind) }) { Text("Back to the usual for ${e.kind.title}") }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(chosen) }, enabled = chosen.isNotEmpty(), modifier = Modifier.testTag("save-track")) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -569,11 +708,12 @@ private fun RestBar(endsAt: Long, seconds: Int, now: Long) {
 
 /** Choosing an exercise: the built-in list and your own, or a new one of your own. */
 @Composable
-private fun ExercisePicker(wvm: WorkoutViewModel, onPick: (Exercise) -> Unit, onDismiss: () -> Unit) {
+fun ExercisePicker(wvm: WorkoutViewModel, onPick: (Exercise) -> Unit, onDismiss: () -> Unit) {
     val all by wvm.exercises.collectAsState()
     var query by remember { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
     var kind by remember { mutableStateOf(ExerciseKind.WEIGHTS) }
+    var track by remember { mutableStateOf(Track.usual(ExerciseKind.WEIGHTS)) }
     val scope = rememberCoroutineScope()
     val shown = Exercises.search(query, all)
     AlertDialog(
@@ -583,13 +723,23 @@ private fun ExercisePicker(wvm: WorkoutViewModel, onPick: (Exercise) -> Unit, on
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextInput(query, { query = it }, if (creating) "Name" else "Search", "field:exercise-search")
                 if (creating) {
-                    Choices(ExerciseKind.entries, kind, { it.title }, { "kind:${it.name}" }) { kind = it }
+                    Text("Tag", style = MaterialTheme.typography.labelLarge)
+                    Choices(ExerciseKind.entries, kind, { it.title }, { "kind:${it.name}" }) {
+                        // Changing the tag suggests what to log, until the user picks their own.
+                        if (track == Track.usual(kind)) track = Track.usual(it)
+                        kind = it
+                    }
+                    Text("What to log for each set", style = MaterialTheme.typography.labelLarge)
+                    TrackChips(track) { track = it }
                 } else {
                     LazyColumn(Modifier.heightIn(max = 340.dp)) {
                         items(shown, key = { it.key }) { e ->
                             Column(Modifier.fillMaxWidth().clickable { onPick(e) }.padding(vertical = 8.dp).testTag("exercise:${e.name}")) {
                                 Text(e.name)
-                                Text(listOf(e.kind.title, e.muscle).filter { it.isNotBlank() }.distinct().joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    (listOf(e.kind.title, e.muscle).filter { it.isNotBlank() }.distinct() + e.tracks.joinToString(", ") { it.title.lowercase() }).joinToString(" · "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                             }
                         }
                     }
@@ -599,7 +749,7 @@ private fun ExercisePicker(wvm: WorkoutViewModel, onPick: (Exercise) -> Unit, on
         },
         confirmButton = {
             if (creating) {
-                TextButton(onClick = { scope.launch { wvm.newExercise(query, kind)?.let(onPick) } }, enabled = query.isNotBlank(), modifier = Modifier.testTag("save-exercise")) {
+                TextButton(onClick = { scope.launch { wvm.newExercise(query, kind, track)?.let(onPick) } }, enabled = query.isNotBlank() && track.isNotEmpty(), modifier = Modifier.testTag("save-exercise")) {
                     Text("Add")
                 }
             }
@@ -650,27 +800,33 @@ fun BestsScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> Unit) {
     }
 }
 
-/** The exercise's ⋮ menu: supersets and, for weights, the plate calculator (0.9.0). */
+/** The exercise's ⋮ menu: what to log, order, circuits and, with the extras, the plate calculator. */
 @Composable
-private fun ExerciseMenu(w: Workout, i: Int, we: io.github.randomtools3377.fitness.core.WorkoutExercise, wvm: WorkoutViewModel, onPlates: () -> Unit) {
+private fun ExerciseMenu(
+    w: Workout, i: Int, we: io.github.randomtools3377.fitness.core.WorkoutExercise, wvm: WorkoutViewModel, extras: Boolean,
+    onPlates: () -> Unit, onTrack: () -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.testTag("exercise-menu:$i")) { Icon(Icons.Filled.MoreVert, contentDescription = "More") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("What to log…") }, onClick = { open = false; onTrack() }, modifier = Modifier.testTag("track-menu:$i"))
+            if (i > 0) DropdownMenuItem(text = { Text("Move up") }, onClick = { open = false; wvm.moveExercise(i, -1) }, modifier = Modifier.testTag("move-up:$i"))
+            if (i < w.exercises.lastIndex) DropdownMenuItem(text = { Text("Move down") }, onClick = { open = false; wvm.moveExercise(i, 1) }, modifier = Modifier.testTag("move-down:$i"))
             if (i < w.exercises.lastIndex) {
                 DropdownMenuItem(
-                    text = { Text("Superset with the next exercise") },
+                    text = { Text("Do in a circuit with the next one") },
                     onClick = { open = false; wvm.joinSuperset(i) },
                     modifier = Modifier.testTag("join-superset:$i"),
                 )
             }
             if (we.superset != null) {
-                DropdownMenuItem(text = { Text("Take out of the superset") }, onClick = { open = false; wvm.leaveSuperset(i) }, modifier = Modifier.testTag("leave-superset:$i"))
+                DropdownMenuItem(text = { Text("Take out of the circuit") }, onClick = { open = false; wvm.leaveSuperset(i) }, modifier = Modifier.testTag("leave-superset:$i"))
             }
-            if (we.exercise.kind == ExerciseKind.WEIGHTS) {
+            if (extras && Track.WEIGHT in we.exercise.tracks) {
                 DropdownMenuItem(text = { Text("Plate calculator") }, onClick = { open = false; onPlates() }, modifier = Modifier.testTag("plates:$i"))
             }
-            DropdownMenuItem(text = { Text("Tap a set's number to mark it a warm-up") }, onClick = { open = false }, enabled = false)
+            DropdownMenuItem(text = { Text("Tap a set's number for its own rest") }, onClick = { open = false }, enabled = false)
         }
     }
 }
