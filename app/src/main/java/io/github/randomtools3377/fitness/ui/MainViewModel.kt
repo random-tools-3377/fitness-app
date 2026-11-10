@@ -172,6 +172,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** The built-in foods, empty until the list has been read. */
     val builtIns = MutableStateFlow<List<Food>>(emptyList())
 
+    /** The built-in foods to list: without those the user replaced with their own copy (0.19.0). */
+    val visibleBuiltIns: StateFlow<List<Food>> = combine(builtIns, settings, foods) { built, s, mine ->
+        FoodSearch.visibleBuiltIns(built, s.replacedBuiltIns, mine)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** The built-in food with this id, for making a copy of it. */
+    fun builtIn(id: String): Food? = builtIns.value.firstOrNull { it.builtInId == id }
+
+    /** The user's own food [ownId] now stands in for the built-in food [builtInId] (0.19.0). */
+    fun replaceBuiltIn(builtInId: String, ownId: Long) = launchSafely {
+        repo.updateSettings { it.copy(replacedBuiltIns = it.replacedBuiltIns + (builtInId to ownId)) }
+    }
+
     /** Whether the built-in list holds CIQUAL's European foods, for the credits. */
     val hasEuropeanFoods: StateFlow<Boolean> = builtIns.map { list -> list.any { it.builtInId?.startsWith("C") == true } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -232,12 +245,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val recipeFoods: StateFlow<List<Food>> = repo.recipes.map { list -> list.map { it.toFood() } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val results: StateFlow<List<Food>> = combine(query.debounce(120), combine(foods, recipeFoods) { a, b -> b + a }, builtIns, usageAndFavourites, usedProducts) { q, mine, built, (used, favs), products ->
+    val results: StateFlow<List<Food>> = combine(query.debounce(120), combine(foods, recipeFoods) { a, b -> b + a }, visibleBuiltIns, usageAndFavourites, usedProducts) { q, mine, built, (used, favs), products ->
         FoodSearch.search(q, mine + products + built, used, now(), favourites = favs)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Foods used before, the most recent and most used first. */
-    val recent: StateFlow<List<Food>> = combine(combine(foods, recipeFoods) { a, b -> b + a }, builtIns, usageAndFavourites, usedProducts) { mine, built, (used, favs), products ->
+    val recent: StateFlow<List<Food>> = combine(combine(foods, recipeFoods) { a, b -> b + a }, visibleBuiltIns, usageAndFavourites, usedProducts) { mine, built, (used, favs), products ->
         FoodSearch.recent(mine + products + built, used, now(), favs).take(30 + favs.size)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 

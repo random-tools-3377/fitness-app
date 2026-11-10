@@ -76,10 +76,21 @@ private class PortionInput(label: String, amount: String) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode: String? = null, back: () -> Unit, saved: (Food) -> Unit) {
+fun FoodFormScreen(
+    vm: MainViewModel,
+    editId: Long?,
+    modifier: Modifier,
+    barcode: String? = null,
+    back: () -> Unit,
+    saved: (Food) -> Unit,
+    /** A built-in food's id, to make the user's own copy of it (0.19.0). */
+    copyOf: String? = null,
+) {
     val units by vm.units.collectAsState()
     val scope = rememberCoroutineScope()
-    var loadedId by remember { mutableStateOf<Long?>(null) }
+    var loadedId by remember { mutableStateOf<String?>(null) }
+    // Vitamins and minerals of a copied built-in food, which the form doesn't show, kept as they are.
+    var keptMicros by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var name by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf(BaseUnit.GRAM) }
@@ -102,9 +113,12 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
     var problems by remember { mutableStateOf<List<String>>(emptyList()) }
     var code by remember { mutableStateOf(barcode) }
 
-    LaunchedEffect(editId) {
-        if (editId != null && loadedId != editId) {
-            vm.food(editId)?.let { f ->
+    LaunchedEffect(editId, copyOf) {
+        val key = editId?.toString() ?: copyOf
+        if (key != null && loadedId != key) {
+            val source = if (editId != null) vm.food(editId) else copyOf?.let { vm.builtIn(it) }?.let { io.github.randomtools3377.fitness.core.FoodSearch.copyOf(it) }
+            source?.let { f ->
+                keptMicros = f.per100.micros - io.github.randomtools3377.fitness.core.Micro.ALCOHOL.key - io.github.randomtools3377.fitness.core.Micro.CAFFEINE.key
                 name = f.name
                 brand = f.brand
                 unit = f.unit
@@ -122,7 +136,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
                 portions.clear()
                 f.portions.forEach { portions.add(PortionInput(it.label, formatAmount(it.amount))) }
             }
-            loadedId = editId
+            loadedId = key
         }
     }
 
@@ -138,6 +152,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
             satFat = Units.parse(satFatText),
             salt = Units.parse(saltText),
             micros = buildMap {
+                putAll(keptMicros)
                 Units.parse(alcoholText)?.let { put(io.github.randomtools3377.fitness.core.Micro.ALCOHOL.key, it) }
                 Units.parse(caffeineText)?.let { put(io.github.randomtools3377.fitness.core.Micro.CAFFEINE.key, it) }
             },
@@ -161,7 +176,12 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
             if (list.none { it.label == label }) list.add(0, Portion(label, size!!))
         }
         val food = Food(id = editId ?: 0, name = name.trim(), brand = brand.trim(), unit = unit, per100 = per100, portions = list, barcode = code)
-        scope.launch { saved(vm.saveFood(food)) }
+        scope.launch {
+            val f = vm.saveFood(food)
+            // A copy of a built-in food stands in for it from now on (0.19.0).
+            if (copyOf != null && editId == null) vm.replaceBuiltIn(copyOf, f.id)
+            saved(f)
+        }
     }
 
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -217,7 +237,7 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
 
     Column(modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(if (editId == null) "A food from its label" else "Change food") },
+            title = { Text(if (editId != null) "Change food" else if (copyOf != null) "Your own copy" else "A food from its label") },
             navigationIcon = {
                 IconButton(onClick = back, modifier = Modifier.testTag("back")) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -229,6 +249,14 @@ fun FoodFormScreen(vm: MainViewModel, editId: Long?, modifier: Modifier, barcode
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             code?.let { Text("Barcode $it: scanning it finds this food from now on.", style = MaterialTheme.typography.bodySmall) }
+            if (copyOf != null && editId == null) {
+                Text(
+                    "Change whatever is different about yours, then save. From then on your copy is used instead of the built-in food, " +
+                        "which is hidden from the lists. Delete your copy to bring the built-in one back. Days already logged keep their numbers.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("copy-hint"),
+                )
+            }
             if (on(io.github.randomtools3377.fitness.core.Feature.LABEL_PHOTO)) Text("Read the numbers from a photo of the label", style = MaterialTheme.typography.labelLarge)
             if (on(io.github.randomtools3377.fitness.core.Feature.LABEL_PHOTO)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {

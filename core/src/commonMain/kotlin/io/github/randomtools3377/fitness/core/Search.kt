@@ -26,6 +26,20 @@ object FoodSearch {
                     .thenBy { it.name.lowercase() },
             )
 
+    /**
+     * The built-in foods to list: all of them, but those the user made their own copy of (0.19.0),
+     * while that copy is still one of their foods. Deleting the copy brings the original back.
+     */
+    fun visibleBuiltIns(built: List<Food>, replaced: Map<String, Long>, mine: List<Food>): List<Food> {
+        if (replaced.isEmpty()) return built
+        val live = mine.filter { !it.hidden }.map { it.id }.toSet()
+        val gone = replaced.filterValues { it in live }.keys
+        return if (gone.isEmpty()) built else built.filter { it.builtInId !in gone }
+    }
+
+    /** A built-in food as the start of the user's own copy: the same numbers and portions, as a new food. */
+    fun copyOf(food: Food): Food = food.copy(id = 0, builtInId = null, hidden = false, barcode = null)
+
     /** Lowercase words, with accents and punctuation taken off. */
     fun words(text: String): List<String> =
         fold(text).split(' ').filter { it.isNotEmpty() }

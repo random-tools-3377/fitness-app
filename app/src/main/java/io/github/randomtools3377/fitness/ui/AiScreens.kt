@@ -83,7 +83,7 @@ fun AiFoodsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val mine by vm.foods.collectAsState()
-    val builtIns by vm.builtIns.collectAsState()
+    val builtIns by vm.visibleBuiltIns.collectAsState()
     val usages by vm.usage.collectAsState()
     val settings by vm.settings.collectAsState()
     val units by vm.units.collectAsState()

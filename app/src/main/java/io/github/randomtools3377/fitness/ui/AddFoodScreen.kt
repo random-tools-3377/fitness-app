@@ -71,6 +71,7 @@ fun AddFoodScreen(
     mode: AddMode = AddMode.LOG,
     planDay: kotlinx.datetime.LocalDate? = null,
     ai: (AiKind) -> Unit = {},
+    copyFood: (builtInId: String) -> Unit = {},
 ) {
     fun add(f: Food, a: Amount) = when (mode) {
         AddMode.LOG -> { vm.log(f, a, meal); Unit }
@@ -208,6 +209,7 @@ fun AddFoodScreen(
             onDismiss = { picked = null },
             favourite = f.key in favourites,
             onFavourite = { on -> vm.setFavourite(f, on) },
+            onCopy = f.builtInId?.let { id -> { picked = null; copyFood(id) } },
         )
     }
     notFound?.let { code ->
@@ -281,6 +283,8 @@ fun AmountDialog(
     current: Meal? = null,
     favourite: Boolean? = null,
     onFavourite: ((Boolean) -> Unit)? = null,
+    /** For a built-in food: make the user's own copy of it, which then stands in for it (0.19.0). */
+    onCopy: (() -> Unit)? = null,
 ) {
     val baseLabel = food.unit.short
     var portion by remember(food.key) { mutableStateOf(initial?.portion ?: food.portions.firstOrNull()?.label) }
@@ -327,6 +331,9 @@ fun AmountDialog(
                     TextButton(onClick = { onFavourite(!favourite) }, modifier = Modifier.testTag("favourite")) {
                         Text(if (favourite) "★ A favourite: tap to unstar" else "☆ Make it a favourite")
                     }
+                }
+                if (onCopy != null) {
+                    TextButton(onClick = onCopy, modifier = Modifier.testTag("copy-food")) { Text("Not quite right? Make my own copy") }
                 }
                 if (onMove != null && current != null) {
                     Text("Meal", style = MaterialTheme.typography.labelLarge)
