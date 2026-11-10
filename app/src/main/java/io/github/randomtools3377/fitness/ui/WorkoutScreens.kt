@@ -307,6 +307,11 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     var noting by remember { mutableStateOf<Exercise?>(null) }
     var tracking by remember { mutableStateOf<Exercise?>(null) }
     var restSet by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Sets shown one by one, by exercise; the rest are shown as one (0.21.0).
+    val eachSet = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    // Sets till failure being ticked, whose reps are asked first, and the circuit round they're in.
+    var askFailure by remember { mutableStateOf<List<Pair<Int, Int>>?>(null) }
+    var failureRound by remember { mutableStateOf<Int?>(null) }
     val extras = on(io.github.randomtools3377.fitness.core.Feature.TRAINING_EXTRAS)
     val notes by wvm.notes.collectAsState()
     val keepOn by wvm.keepScreenOn.collectAsState()
@@ -361,6 +366,16 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                             onClick = { menu = false; wvm.setKeepScreenOn(!keepOn) },
                             modifier = Modifier.testTag("toggle-screen-on"),
                         )
+                        if (w.exercises.size >= 2) DropdownMenuItem(
+                            text = { Text("Make it all one circuit") },
+                            onClick = { menu = false; wvm.allOneCircuit(true) },
+                            modifier = Modifier.testTag("all-one-circuit"),
+                        )
+                        if (w.exercises.any { it.superset != null }) DropdownMenuItem(
+                            text = { Text("No circuits") },
+                            onClick = { menu = false; wvm.allOneCircuit(false) },
+                            modifier = Modifier.testTag("no-circuits"),
+                        )
                         DropdownMenuItem(text = { Text("Discard this workout") }, onClick = { menu = false; discarding = true }, modifier = Modifier.testTag("discard-workout"))
                     }
                 }
@@ -411,11 +426,37 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
                         }
                     }
                     val tracks = we.exercise.tracks
-                    SetHeader(tracks, units)
-                    we.sets.forEachIndexed { j, s ->
-                        SetRow(w.id, i, j, tracks, s, units, wvm, "${w.exercises.size}:${we.sets.size}:$refills:$tracks", extras, rests = !we.exercise.long, onRest = { restSet = i to j })
+                    // All the sets at once (0.21.0); each set one by one when they differ, or asked for.
+                    AllSetsBar(tracks, we.sets, units, "$i", onCount = { wvm.setCount(i, it); refills++ }, onOpen = { f -> wvm.updateOpen(i, f); refills++ })
+                    val showEach = eachSet["$i:${we.exercise.key}"] ?: eachSetAtFirst(we.sets)
+                    val tickSet = { j: Int ->
+                        val s = we.sets[j]
+                        if (!s.done && s.toFailure && s.reps == null) askFailure = listOf(i to j) else wvm.tick(i, j)
                     }
-                    TextButton(onClick = { wvm.addSet(i) }, modifier = Modifier.testTag("add-set:$i")) { Text("+ Add a set") }
+                    if (showEach) {
+                        SetHeader(tracks, units)
+                        we.sets.forEachIndexed { j, s ->
+                            SetRow(w.id, i, j, tracks, s, units, wvm, "${w.exercises.size}:${we.sets.size}:$refills:$tracks", extras, rests = !we.exercise.long, onRest = { restSet = i to j }, onTick = { tickSet(j) })
+                        }
+                    } else {
+                        SetChips(we.sets, "$i") { j -> tickSet(j) }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        EachSetToggle(showEach, "$i") { eachSet["$i:${we.exercise.key}"] = !showEach }
+                        if (showEach) TextButton(onClick = { wvm.addSet(i) }, modifier = Modifier.testTag("add-set:$i")) { Text("+ Add a set") }
+                    }
+                    // The end of a circuit: tick a whole round at once (0.21.0).
+                    val g = we.superset
+                    if (g != null && w.exercises.indexOfLast { it.superset == g } == i) {
+                        val round = Workouts.round(w, g)
+                        if (round.isNotEmpty()) {
+                            val n = w.exercises.filter { it.superset == g }.minOf { x -> x.sets.count { it.done } } + 1
+                            Button(onClick = {
+                                val fail = round.filter { (a, b) -> w.exercises[a].sets[b].let { it.toFailure && it.reps == null } }
+                                if (fail.isEmpty()) wvm.roundDone(g) else { askFailure = fail; failureRound = g }
+                            }, modifier = Modifier.fillMaxWidth().testTag("round-done:$g")) { Text("✓ Round $n of the circuit done") }
+                        }
+                    }
                 }
             }
             item {
@@ -429,6 +470,14 @@ fun ActiveWorkoutScreen(wvm: WorkoutViewModel, modifier: Modifier, back: () -> U
     }
 
     if (picking) ExercisePicker(wvm, onPick = { wvm.addExercise(it); picking = false }, onDismiss = { picking = false })
+    askFailure?.let { list ->
+        FailureRepsDialog(list.map { (a, _) -> w.exercises.getOrNull(a)?.exercise?.name ?: "" }, onDone = { reps ->
+            val r = failureRound
+            if (r != null) wvm.roundDone(r, list.zip(reps).toMap())
+            else list.zip(reps).forEach { (p, n) -> wvm.tick(p.first, p.second, n) }
+            askFailure = null; failureRound = null; refills++
+        }, onDismiss = { askFailure = null; failureRound = null })
+    }
     tracking?.let { e ->
         TrackDialog(e, onSave = { wvm.setTrack(e, it); tracking = null; refills++ }, onDismiss = { tracking = null })
     }
@@ -551,7 +600,7 @@ fun androidx.compose.foundation.layout.RowScope.SetBoxes(
         Track.WEIGHT -> SetField(s.weightKg?.let { formatAmount(Units.kgToShown(it, units.weight)) } ?: "", "field:weight:$tag", "$key:w", true, Modifier.weight(1f)) { x ->
             update { it.copy(weightKg = Units.parse(x)?.let { v -> Units.shownToKg(v, units.weight) }) }
         }
-        Track.REPS -> SetField(s.reps?.toString() ?: "", "field:reps:$tag", "$key:reps", false, Modifier.weight(1f)) { x -> update { it.copy(reps = x.toIntOrNull()) } }
+        Track.REPS -> SetField(s.reps?.toString() ?: "", "field:reps:$tag", "$key:reps", false, Modifier.weight(1f), placeholder = if (s.toFailure) "max" else null) { x -> update { it.copy(reps = x.toIntOrNull()) } }
         Track.SECONDS -> SetField(s.seconds?.toString() ?: "", "field:seconds:$tag", "$key:seconds", false, Modifier.weight(1f)) { x -> update { it.copy(seconds = x.toIntOrNull()) } }
         Track.MINUTES -> SetField(s.seconds?.let { formatAmount(Math.round(it / 6.0) / 10.0) } ?: "", "field:minutes:$tag", "$key:minutes", true, Modifier.weight(1f)) { x ->
             update { it.copy(seconds = Units.parse(x)?.let { m -> (m * 60).toInt() }) }
@@ -564,10 +613,11 @@ fun androidx.compose.foundation.layout.RowScope.SetBoxes(
 
 /** A small number box inside a set row. Keeps what is typed while it is being typed. */
 @Composable
-private fun SetField(initial: String, tag: String, stateKey: String, decimals: Boolean, modifier: Modifier, onValue: (String) -> Unit) {
+private fun SetField(initial: String, tag: String, stateKey: String, decimals: Boolean, modifier: Modifier, placeholder: String? = null, onValue: (String) -> Unit) {
     var text by remember(stateKey) { mutableStateOf(initial) }
     OutlinedTextField(
         value = text,
+        placeholder = placeholder?.let { p -> { Text(p) } },
         onValueChange = { t -> val f = t.filter { it.isDigit() || (decimals && (it == '.' || it == ',')) }; text = f; onValue(f) },
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyLarge,
@@ -579,7 +629,7 @@ private fun SetField(initial: String, tag: String, stateKey: String, decimals: B
 @Composable
 private fun SetRow(
     workoutId: Long, i: Int, j: Int, tracks: List<Track>, s: WorkoutSet, units: UnitSettings, wvm: WorkoutViewModel, shape: String,
-    extras: Boolean, rests: Boolean, onRest: () -> Unit,
+    extras: Boolean, rests: Boolean, onRest: () -> Unit, onTick: () -> Unit,
 ) {
     // Changes when sets or exercises are added or removed, so the boxes are filled in afresh.
     val key = "$workoutId:$i:$j:$shape"
@@ -589,7 +639,7 @@ private fun SetRow(
         Box(Modifier.width(36.dp)) {
             Text(
                 if (s.warmUp) "W" else "${j + 1}",
-                Modifier.clickable(enabled = rests || extras) { menu = true }.padding(vertical = 12.dp).testTag("warmup:$i:$j"),
+                Modifier.clickable { menu = true }.padding(vertical = 12.dp).testTag("warmup:$i:$j"),
                 color = if (s.done) MaterialTheme.colorScheme.outline else if (s.warmUp) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium,
             )
@@ -604,10 +654,15 @@ private fun SetRow(
                     onClick = { menu = false; wvm.toggleWarmUp(i, j) },
                     modifier = Modifier.testTag("make-warmup:$i:$j"),
                 )
+                if (Track.REPS in tracks) DropdownMenuItem(
+                    text = { Text(if (s.toFailure) "✓ Reps till failure" else "Reps till failure") },
+                    onClick = { menu = false; wvm.updateSet(i, j) { it.copy(toFailure = !it.toFailure, reps = if (!it.toFailure && !it.done) null else it.reps) } },
+                    modifier = Modifier.testTag("failure:$i:$j"),
+                )
             }
         }
         SetBoxes(tracks, s, units, key, "$i:$j") { f -> wvm.updateSet(i, j, f) }
-        FilledIconToggleButton(checked = s.done, onCheckedChange = { wvm.tick(i, j) }, modifier = Modifier.testTag("tick:$i:$j")) {
+        FilledIconToggleButton(checked = s.done, onCheckedChange = { onTick() }, modifier = Modifier.testTag("tick:$i:$j")) {
             Icon(Icons.Filled.Check, contentDescription = if (s.done) "Done" else "Tick when done")
         }
         IconButton(onClick = { wvm.removeSet(i, j) }) { Icon(Icons.Filled.Close, contentDescription = "Remove set") }
@@ -822,6 +877,10 @@ private fun ExerciseMenu(
                 )
             }
             if (we.superset != null) {
+                val first = w.exercises.indexOfFirst { it.superset == we.superset }
+                val last = w.exercises.indexOfLast { it.superset == we.superset }
+                if (first > 0) DropdownMenuItem(text = { Text("Move the whole circuit up") }, onClick = { open = false; wvm.moveCircuit(i, -1) }, modifier = Modifier.testTag("circuit-up:$i"))
+                if (last < w.exercises.lastIndex) DropdownMenuItem(text = { Text("Move the whole circuit down") }, onClick = { open = false; wvm.moveCircuit(i, 1) }, modifier = Modifier.testTag("circuit-down:$i"))
                 DropdownMenuItem(text = { Text("Take out of the circuit") }, onClick = { open = false; wvm.leaveSuperset(i) }, modifier = Modifier.testTag("leave-superset:$i"))
             }
             if (extras && Track.WEIGHT in we.exercise.tracks) {

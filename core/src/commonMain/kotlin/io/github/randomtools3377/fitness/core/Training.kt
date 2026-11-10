@@ -111,39 +111,76 @@ object Supersets {
     }
 
     /**
-     * Moves exercise [index] up (-1) or down (+1), past the next exercise or the next whole
-     * group. An exercise in a group moves with its whole group.
+     * Where each exercise goes when exercise [index] moves up (-1) or down (+1), and the groups
+     * after (0.21.0). Inside a circuit it swaps with its neighbour there; at the circuit's edge it
+     * steps out, past the next exercise or circuit. An exercise on its own moves past the next
+     * exercise or whole circuit. With [whole], its whole circuit moves. Null if it can't move.
      */
-    fun move(list: List<WorkoutExercise>, index: Int, by: Int): List<WorkoutExercise> {
-        if (index !in list.indices) return list
-        val blocks = mutableListOf<MutableList<WorkoutExercise>>()
-        for (e in list) {
+    fun reorder(groups: List<Int?>, index: Int, by: Int, whole: Boolean = false): Pair<List<Int>, List<Int?>>? {
+        if (index !in groups.indices) return null
+        val blocks = mutableListOf<MutableList<Int>>()
+        for (i in groups.indices) {
             val last = blocks.lastOrNull()
-            if (last != null && e.superset != null && last.first().superset == e.superset) last += e else blocks += mutableListOf(e)
+            if (last != null && groups[i] != null && groups[last.first()] == groups[i]) last += i else blocks += mutableListOf(i)
         }
-        var at = 0
-        var b = 0
-        while (at + blocks[b].size <= index) { at += blocks[b].size; b++ }
-        val to = b + (if (by < 0) -1 else 1)
-        if (to !in blocks.indices) return list
-        val x = blocks.removeAt(b)
-        blocks.add(to, x)
-        return tidy(blocks.flatten())
+        val gs = groups.toMutableList()
+        val b = blocks.indexOfFirst { index in it }
+        val block = blocks[b]
+        if (whole || block.size == 1) {
+            val to = b + by
+            if (to !in blocks.indices) return null
+            blocks.add(to, blocks.removeAt(b))
+        } else {
+            val at = block.indexOf(index)
+            val to = at + by
+            if (to in block.indices) {
+                block[at] = block[to]
+                block[to] = index
+            } else {
+                // Steps out of the circuit, past the next exercise or circuit on that side.
+                block.removeAt(at)
+                gs[index] = null
+                val single = mutableListOf(index)
+                if (by < 0) blocks.add(if (b - 1 >= 0) b - 1 else b, single)
+                else blocks.add(if (b + 1 < blocks.size) b + 2 else b + 1, single)
+            }
+        }
+        val order = blocks.flatten()
+        return order to keepWhole(order.map { gs[it] })
     }
+
+    /** The groups kept, with any split apart or left with one exercise ended. */
+    private fun keepWhole(groups: List<Int?>): List<Int?> {
+        val ok = wholeGroups(groups)
+        return groups.map { g -> g?.takeIf { it in ok } }
+    }
+
+    fun move(list: List<WorkoutExercise>, index: Int, by: Int, whole: Boolean = false): List<WorkoutExercise> {
+        val (order, groups) = reorder(list.map { it.superset }, index, by, whole) ?: return list
+        return order.mapIndexed { k, i -> list[i].copy(superset = groups[k]) }
+    }
+
+    fun moveItems(list: List<SavedWorkoutItem>, index: Int, by: Int, whole: Boolean = false): List<SavedWorkoutItem> {
+        val (order, groups) = reorder(list.map { it.superset }, index, by, whole) ?: return list
+        return order.mapIndexed { k, i -> list[i].copy(superset = groups[k]) }
+    }
+
+    /** Every exercise in one circuit, or (with [on] false) none in any (0.21.0). */
+    fun allOne(groups: Int, on: Boolean): List<Int?> = List(groups) { if (on && groups >= 2) 1 else null }
 
     /** Groups split apart, or left with one exercise, end. */
     fun tidy(list: List<WorkoutExercise>): List<WorkoutExercise> {
-        val ok = whole(list.map { it.superset })
+        val ok = wholeGroups(list.map { it.superset })
         return list.map { if (it.superset != null && it.superset !in ok) it.copy(superset = null) else it }
     }
 
     /** The same for a saved workout's exercises. */
     fun tidyItems(list: List<SavedWorkoutItem>): List<SavedWorkoutItem> {
-        val ok = whole(list.map { it.superset })
+        val ok = wholeGroups(list.map { it.superset })
         return list.map { if (it.superset != null && it.superset !in ok) it.copy(superset = null) else it }
     }
 
-    private fun whole(groups: List<Int?>): Set<Int> = groups.filterNotNull().toSet().filter { g ->
+    private fun wholeGroups(groups: List<Int?>): Set<Int> = groups.filterNotNull().toSet().filter { g ->
         val at = groups.indices.filter { groups[it] == g }
         at.size >= 2 && at.last() - at.first() == at.size - 1
     }.toSet()
@@ -163,12 +200,6 @@ object Supersets {
             l.mapIndexed { i, e -> if (i > index && e.superset == g) e.copy(superset = next) else e }
         })
 
-    fun moveItems(list: List<SavedWorkoutItem>, index: Int, by: Int): List<SavedWorkoutItem> {
-        // Moved as workout exercises, then back.
-        val asWorkout = list.map { WorkoutExercise(it.exercise, emptyList(), it.superset) }
-        val order = move(asWorkout.mapIndexed { i, e -> e.copy(sets = listOf(WorkoutSet(reps = i))) }, index, by)
-        return tidyItems(order.map { e -> list[e.sets.first().reps!!].copy(superset = e.superset) })
-    }
 
     /**
      * Whether ticking a set of exercise [index] should start the rest timer: in a superset, only

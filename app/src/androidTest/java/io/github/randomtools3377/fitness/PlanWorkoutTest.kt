@@ -63,8 +63,12 @@ class PlanWorkoutTest {
         app.onNodeWithTag("field:plan-name").performTextInput("Circuit")
         app.tap("plan-add-exercise")
         pick("Jumping jacks", "jumping")
-        app.waitFor { !gone("field:reps:plan:0:0") }
-        app.onNodeWithTag("field:reps:plan:0:0").performTextReplacement("20")
+        // Three sets the same: changed all at once.
+        app.waitFor { !gone("all:reps:plan:0") }
+        app.tap("all:reps:plan:0")
+        app.onNodeWithTag("field:value").performTextInput("20")
+        app.tap("save-value")
+        app.waitFor { textIs("all:reps:plan:0", "20") }
         app.tap("plan-add-exercise")
         pick("Push-up", "push-up")
         app.waitFor { !gone("plan-menu:0") }
@@ -75,15 +79,21 @@ class PlanWorkoutTest {
 
         app.waitFor { !gone("start:Circuit") }
         app.onNodeWithTag("start:Circuit").performClick()
-        app.waitFor { !gone("field:reps:0:0") }
-        app.waitFor { textIs("field:reps:0:0", "20") }
-        app.onNodeWithTag("field:reps:1:0").performTextReplacement("10")
+        app.waitFor { !gone("all:reps:0") }
+        app.waitFor { textIs("all:reps:0", "20") }
+        app.tap("plus:reps:1")
+        app.waitFor { textIs("all:reps:1", "1") }
 
         // One set of each, then rest.
         app.tap("tick:0:0")
         app.waitForIdle()
         check(gone("rest-timer")) { "No rest between the exercises of a circuit" }
         app.tap("tick:1:0")
+        app.waitFor { !gone("rest-timer") }
+        app.tap("skip-rest")
+
+        // A whole round at once.
+        app.tap("round-done:1")
         app.waitFor { !gone("rest-timer") }
     }
 }

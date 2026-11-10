@@ -47,6 +47,7 @@ import io.github.randomtools3377.fitness.core.Feature
 import io.github.randomtools3377.fitness.core.SavedWorkout
 import io.github.randomtools3377.fitness.core.SavedWorkoutItem
 import io.github.randomtools3377.fitness.core.Supersets
+import io.github.randomtools3377.fitness.core.Track
 import io.github.randomtools3377.fitness.core.WorkoutSet
 import io.github.randomtools3377.fitness.core.Workouts
 
@@ -72,6 +73,7 @@ fun PlanWorkoutScreen(wvm: WorkoutViewModel, id: Long, modifier: Modifier, back:
     var restFor by remember { mutableStateOf<Exercise?>(null) }
     var restSet by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var leaving by remember { mutableStateOf(false) }
+    val eachSet = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
     var changed by remember { mutableStateOf(false) }
 
     LaunchedEffect(saved, id) {
@@ -117,6 +119,16 @@ fun PlanWorkoutScreen(wvm: WorkoutViewModel, id: Long, modifier: Modifier, back:
                             "Once you've done an exercise, its numbers come from last time; the rests stay as planned here.",
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    // One circuit for everything, or none (0.21.0).
+                    if (items.size >= 2) Row {
+                        TextButton(onClick = {
+                            val g = Supersets.allOne(items.size, true)
+                            edit({ l -> l.mapIndexed { k, it -> it.copy(superset = g[k]) } })
+                        }, modifier = Modifier.testTag("plan-all-one")) { Text("All one circuit") }
+                        if (items.any { it.superset != null }) TextButton(onClick = {
+                            edit({ l -> l.map { it.copy(superset = null) } })
+                        }, modifier = Modifier.testTag("plan-no-circuits")) { Text("No circuits") }
+                    }
                 }
             }
             itemsIndexed(items, key = { i, it -> "$i:${it.exercise.key}:$shape" }) { i, item ->
@@ -132,8 +144,11 @@ fun PlanWorkoutScreen(wvm: WorkoutViewModel, id: Long, modifier: Modifier, back:
                                 modifier = Modifier.clickable { restFor = e }.testTag("plan-rest:$i"),
                             )
                         }
+                        val g = item.superset
                         PlanItemMenu(
-                            i, items.size, item.superset != null,
+                            i, items.size, g != null,
+                            canMoveCircuit = g != null && (items.indexOfFirst { it.superset == g } > 0 || items.indexOfLast { it.superset == g } < items.lastIndex),
+                            onMoveCircuit = { by -> edit({ Supersets.moveItems(it, i, by, whole = true) }, reshape = true) },
                             onTrack = { tracking = i },
                             onMove = { by -> edit({ Supersets.moveItems(it, i, by) }, reshape = true) },
                             onJoin = { edit({ Supersets.joinItems(it, i) }) },
@@ -150,11 +165,17 @@ fun PlanWorkoutScreen(wvm: WorkoutViewModel, id: Long, modifier: Modifier, back:
                         )
                     }
                     val tracks = e.tracks
-                    SetHeader(tracks, units, end = 48.dp)
-                    item.plan.forEachIndexed { j, s ->
+                    // All the sets at once (0.21.0).
+                    AllSetsBar(tracks, item.plan, units, "plan:$i",
+                        onCount = { n -> setPlan(i, { Workouts.resize(it, n.coerceIn(1, 30)) }, reshape = true) },
+                        onOpen = { f -> setPlan(i, { p -> p.map(f) }, reshape = true) })
+                    val showEach = eachSet["$i:${e.key}"] ?: eachSetAtFirst(item.plan)
+                    if (showEach) SetHeader(tracks, units, end = 48.dp)
+                    if (showEach) item.plan.forEachIndexed { j, s ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            PlanSetNumber(i, j, s, rests = !e.long, extras = extras,
+                            PlanSetNumber(i, j, s, rests = !e.long, extras = extras, reps = Track.REPS in tracks,
                                 onRest = { restSet = i to j },
+                                onFailure = { setPlan(i, { p -> p.mapIndexed { k, x -> if (k == j) x.copy(toFailure = !x.toFailure, reps = if (!x.toFailure) null else x.reps) else x } }, reshape = true) },
                                 onWarmUp = { setPlan(i, { p -> p.mapIndexed { k, x -> if (k == j) x.copy(warmUp = !x.warmUp) else x } }) })
                             SetBoxes(tracks, s, units, "plan:$i:$j:$shape:$tracks", "plan:$i:$j") { f ->
                                 setPlan(i, { p -> p.mapIndexed { k, x -> if (k == j) f(x) else x } })
@@ -167,10 +188,13 @@ fun PlanWorkoutScreen(wvm: WorkoutViewModel, id: Long, modifier: Modifier, back:
                             Text("Then rest ${Workouts.clock(it)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 36.dp))
                         }
                     }
-                    TextButton(
-                        onClick = { setPlan(i, { p -> p + (p.lastOrNull()?.copy(warmUp = false) ?: WorkoutSet()) }, reshape = true) },
-                        modifier = Modifier.testTag("plan-add-set:$i"),
-                    ) { Text("+ Add a set") }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        EachSetToggle(showEach, "plan:$i") { eachSet["$i:${e.key}"] = !showEach }
+                        if (showEach) TextButton(
+                            onClick = { setPlan(i, { p -> Workouts.resize(p, p.size + 1) }, reshape = true) },
+                            modifier = Modifier.testTag("plan-add-set:$i"),
+                        ) { Text("+ Add a set") }
+                    }
                 }
             }
             item {
@@ -225,12 +249,12 @@ fun PlanWorkoutScreen(wvm: WorkoutViewModel, id: Long, modifier: Modifier, back:
 }
 
 @Composable
-private fun PlanSetNumber(i: Int, j: Int, s: WorkoutSet, rests: Boolean, extras: Boolean, onRest: () -> Unit, onWarmUp: () -> Unit) {
+private fun PlanSetNumber(i: Int, j: Int, s: WorkoutSet, rests: Boolean, extras: Boolean, reps: Boolean, onRest: () -> Unit, onFailure: () -> Unit, onWarmUp: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Box(Modifier.width(36.dp)) {
         Text(
             if (s.warmUp) "W" else "${j + 1}",
-            Modifier.clickable(enabled = rests || extras) { menu = true }.padding(vertical = 12.dp).testTag("plan-set:$i:$j"),
+            Modifier.clickable(enabled = rests || extras || reps) { menu = true }.padding(vertical = 12.dp).testTag("plan-set:$i:$j"),
             color = if (s.warmUp) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Medium,
         )
@@ -241,13 +265,18 @@ private fun PlanSetNumber(i: Int, j: Int, s: WorkoutSet, rests: Boolean, extras:
                 modifier = Modifier.testTag("plan-set-rest:$i:$j"),
             )
             if (extras) DropdownMenuItem(text = { Text(if (s.warmUp) "Make it a working set" else "Make it a warm-up set") }, onClick = { menu = false; onWarmUp() })
+            if (reps) DropdownMenuItem(
+                text = { Text(if (s.toFailure) "✓ Reps till failure" else "Reps till failure") },
+                onClick = { menu = false; onFailure() },
+                modifier = Modifier.testTag("plan-failure:$i:$j"),
+            )
         }
     }
 }
 
 @Composable
 private fun PlanItemMenu(
-    i: Int, count: Int, inCircuit: Boolean,
+    i: Int, count: Int, inCircuit: Boolean, canMoveCircuit: Boolean, onMoveCircuit: (Int) -> Unit,
     onTrack: () -> Unit, onMove: (Int) -> Unit, onJoin: () -> Unit, onLeave: () -> Unit, onRemove: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -258,6 +287,10 @@ private fun PlanItemMenu(
             if (i > 0) DropdownMenuItem(text = { Text("Move up") }, onClick = { open = false; onMove(-1) }, modifier = Modifier.testTag("plan-up:$i"))
             if (i < count - 1) DropdownMenuItem(text = { Text("Move down") }, onClick = { open = false; onMove(1) }, modifier = Modifier.testTag("plan-down:$i"))
             if (i < count - 1) DropdownMenuItem(text = { Text("Do in a circuit with the next one") }, onClick = { open = false; onJoin() }, modifier = Modifier.testTag("plan-join:$i"))
+            if (canMoveCircuit) {
+                DropdownMenuItem(text = { Text("Move the whole circuit up") }, onClick = { open = false; onMoveCircuit(-1) }, modifier = Modifier.testTag("plan-circuit-up:$i"))
+                DropdownMenuItem(text = { Text("Move the whole circuit down") }, onClick = { open = false; onMoveCircuit(1) }, modifier = Modifier.testTag("plan-circuit-down:$i"))
+            }
             if (inCircuit) DropdownMenuItem(text = { Text("Take out of the circuit") }, onClick = { open = false; onLeave() }, modifier = Modifier.testTag("plan-leave:$i"))
             DropdownMenuItem(text = { Text("Remove") }, onClick = { open = false; onRemove() }, modifier = Modifier.testTag("plan-remove:$i"))
         }

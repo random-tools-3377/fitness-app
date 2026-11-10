@@ -194,14 +194,50 @@ class WorkoutsTest {
     }
 
     @Test
-    fun movingAnExerciseKeepsOrEndsItsGroup() {
+    fun movingInsideACircuitSwapsAndAtItsEdgeStepsOut() {
         val a = WorkoutExercise(squat, emptyList(), 1)
         val b = WorkoutExercise(pushUp, emptyList(), 1)
         val c = WorkoutExercise(plank, emptyList())
-        // A group moves as one.
-        assertEquals(listOf(c, a, b), Supersets.move(listOf(a, b, c), 1, 1))
+        // Inside the circuit: swap, still a circuit.
+        assertEquals(listOf(b.copy(), a.copy(), c), Supersets.move(listOf(a, b, c), 0, 1))
+        // At its edge: step out, past the next exercise; a circuit of one ends.
+        assertEquals(listOf(a.copy(superset = null), c, b.copy(superset = null)), Supersets.move(listOf(a, b, c), 1, 1))
+        // The whole circuit moves.
+        assertEquals(listOf(c, a, b), Supersets.move(listOf(a, b, c), 0, 1, whole = true))
+        // On its own, an exercise moves past a whole circuit.
         assertEquals(listOf(c, a, b), Supersets.move(listOf(a, b, c), 2, -1))
-        assertEquals(listOf(a, b, c), Supersets.move(listOf(a, b, c), 0, -1))
+        assertEquals(listOf(a, b, c), Supersets.move(listOf(a, b, c), 0, -1, whole = true))
+        assertEquals(listOf(null, null, null), Supersets.move(listOf(a, b, c), 0, -1).map { it.superset })
         assertEquals(listOf(1, 1, null), Supersets.tidy(listOf(a, b, c)).map { it.superset })
+        assertEquals(listOf(1, 1, 1), Supersets.allOne(3, true))
+        assertEquals(listOf(null, null), Supersets.allOne(2, false))
+    }
+
+    @Test
+    fun setsCanBeChangedAllAtOnceAndTillFailure() {
+        val same = listOf(WorkoutSet(reps = 10), WorkoutSet(reps = 10))
+        assertTrue(Workouts.uniform(same))
+        assertTrue(!Workouts.uniform(same + WorkoutSet(reps = 8)))
+        assertEquals(4, Workouts.resize(same, 4).size)
+        assertEquals(10, Workouts.resize(same, 4).last().reps)
+        // Ticked sets stay.
+        assertEquals(2, Workouts.resize(listOf(done(null, 10), done(null, 10)), 1).size)
+        assertEquals(listOf(11, 10), Workouts.open(listOf(WorkoutSet(reps = 10), done(null, 10))) { it.copy(reps = 11) }.map { it.reps })
+        // Till failure: planned with no number, typed when done; next time it starts empty again.
+        val u = UnitSettings()
+        assertEquals("12 reps, till failure", Workouts.describe(done(null, 12).copy(toFailure = true), u))
+        val sw = SavedWorkout(1, "Max", listOf(SavedWorkoutItem(pushUp, 1, plan = listOf(WorkoutSet(toFailure = true)))))
+        val first = Workouts.start(sw, emptyList(), day, 0)
+        val did = first.copy(endedAt = 1, exercises = listOf(first.exercises[0].copy(sets = listOf(done(null, 31).copy(toFailure = true)))))
+        val next = Workouts.start(sw, listOf(did), day, 2)
+        assertEquals(null, next.exercises[0].sets[0].reps)
+        assertTrue(next.exercises[0].sets[0].toFailure)
+        // A round of a circuit: the next open set of each of its exercises.
+        val w = Workout(name = "C", day = day, startedAt = 0, exercises = listOf(
+            WorkoutExercise(pushUp, listOf(done(null, 10), WorkoutSet(reps = 10)), 1),
+            WorkoutExercise(squat, listOf(WorkoutSet(reps = 5), WorkoutSet(reps = 5)), 1),
+            WorkoutExercise(plank, listOf(WorkoutSet(seconds = 30))),
+        ))
+        assertEquals(listOf(0 to 1, 1 to 0), Workouts.round(w, 1))
     }
 }

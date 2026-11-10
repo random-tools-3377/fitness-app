@@ -143,6 +143,21 @@ Decided on 2026-11-10, after trying the workouts (0.20.0):
   the workout's menu. A planned workout's numbers are used the first time; after that each
   exercise fills in from last time, while its rests and warm-ups stay as planned.
 
+Decided on 2026-11-10, after trying 0.20.0 (0.21.0):
+
+- Reps can be "till failure".
+- Sets are quicker to change: the same exercise usually has the same reps every set, so all of
+  an exercise's sets can be changed at once, with − and + buttons.
+- Moving an exercise up or down works inside a circuit.
+- One button puts every exercise in one circuit.
+- One button ticks a whole round of a circuit.
+- **Details (default):** − and + change every set not yet ticked; typing a number makes them all
+  the same. When an exercise's sets are all the same they show as one, with a small button per
+  set to tick, and "Each set" opens them one by one. A set till failure has no number planned;
+  when it's ticked the app asks how many reps were done (it can be left empty). At a circuit's
+  edge, moving an exercise further takes it out of the circuit; "Move the whole circuit" moves
+  the circuit.
+
 ## Calories burned
 
 - Estimated from logged workouts, using the body weight, and added to the day's calorie allowance.

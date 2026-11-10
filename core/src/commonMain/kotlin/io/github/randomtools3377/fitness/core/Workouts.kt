@@ -285,6 +285,8 @@ data class WorkoutSet(
     val warmUp: Boolean = false,
     /** The rest after this set, if it has its own (0.20.0); otherwise the exercise's. */
     val restSeconds: Int? = null,
+    /** Reps till failure (0.21.0): no number planned; the reps done are typed when it's ticked. */
+    val toFailure: Boolean = false,
 )
 
 /** An exercise as done in one workout: its sets in order. */
@@ -356,14 +358,17 @@ object Workouts {
             val hasPlan = item.plan.isNotEmpty()
             val sets = item.planned().mapIndexed { i, p ->
                 val from = last?.getOrNull(i) ?: last?.lastOrNull()
-                if (from == null) p.copy(done = false, doneAt = null)
+                val set = if (from == null) p.copy(done = false, doneAt = null)
                 else from.copy(
                     done = false, doneAt = null,
                     weightKg = from.weightKg ?: p.weightKg, reps = from.reps ?: p.reps,
                     seconds = from.seconds ?: p.seconds, distanceKm = from.distanceKm ?: p.distanceKm,
                     warmUp = if (hasPlan) p.warmUp else from.warmUp,
                     restSeconds = if (hasPlan) p.restSeconds else from.restSeconds,
+                    toFailure = if (hasPlan) p.toFailure else from.toFailure,
                 )
+                // Till failure: the reps are what's done this time, so they start empty.
+                if (set.toFailure) set.copy(reps = null) else set
             }
             WorkoutExercise(item.exercise, sets, item.superset)
         },
@@ -404,6 +409,7 @@ object Workouts {
             kg != null -> bits += kg
             reps != null -> bits += "$reps ${if (reps == 1) "rep" else "reps"}"
         }
+        if (set.toFailure) bits += if (reps == null) "reps till failure" else "till failure"
         val time = set.seconds?.takeIf { it > 0 }?.let { clock(it) }
         val km = set.distanceKm?.takeIf { it > 0 }?.let { Units.distance(it, u.distance) }
         when {
@@ -412,6 +418,31 @@ object Workouts {
         }
         return bits.joinToString(", ").ifEmpty { "—" }
     }
+
+    /** Whether every set is the same, so they can be shown and changed as one (0.21.0). */
+    fun uniform(sets: List<WorkoutSet>): Boolean = sets.map { it.copy(done = false, doneAt = null) }.distinct().size <= 1
+
+    /** [sets] made [n] long: new ones copy the last (not ticked, not a warm-up); only open sets at the end go. */
+    fun resize(sets: List<WorkoutSet>, n: Int): List<WorkoutSet> {
+        if (n > sets.size) {
+            val last = sets.lastOrNull()?.copy(done = false, doneAt = null, warmUp = false)?.let { if (it.toFailure) it.copy(reps = null) else it } ?: WorkoutSet()
+            return sets + List(n - sets.size) { last }
+        }
+        val out = sets.toMutableList()
+        while (out.size > maxOf(n, 1) && !out.last().done) out.removeAt(out.lastIndex)
+        return out
+    }
+
+    /** [f] applied to every set not yet ticked. */
+    fun open(sets: List<WorkoutSet>, f: (WorkoutSet) -> WorkoutSet): List<WorkoutSet> = sets.map { if (it.done) it else f(it) }
+
+    /**
+     * A round of circuit [group]: the first set not yet ticked of each of its exercises, as
+     * (exercise index, set index). Empty when the circuit is finished.
+     */
+    fun round(w: Workout, group: Int): List<Pair<Int, Int>> = w.exercises.indices
+        .filter { w.exercises[it].superset == group }
+        .mapNotNull { i -> w.exercises[i].sets.indexOfFirst { !it.done }.takeIf { it >= 0 }?.let { i to it } }
 
     private val planJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     private val planSerializer = kotlinx.serialization.builtins.ListSerializer(WorkoutSet.serializer())
