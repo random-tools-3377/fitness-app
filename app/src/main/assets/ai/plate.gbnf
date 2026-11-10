@@ -1,2 +1,2 @@
 root ::= line{1,8}
-line ::= [a-zA-Z] [a-zA-Z ,'-]{0,29} "\n"
+line ::= [a-zA-Z] [a-zA-Z '-]{0,39} "\n"

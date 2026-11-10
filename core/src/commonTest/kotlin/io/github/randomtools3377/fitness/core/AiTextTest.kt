@@ -18,8 +18,14 @@ class AiTextTest {
 
     @Test
     fun theModelsLinesAreRead() {
-        val items = AiText.items("2 | piece | boiled egg\n1 | slice | white bread\nnot a line\n0,5 | tbsp | butter\n")
-        assertEquals(listOf(AiText.Item(2.0, "piece", "boiled egg"), AiText.Item(1.0, "slice", "white bread"), AiText.Item(0.5, "tbsp", "butter")), items)
+        val items = AiText.items("boiled egg | 2 | piece\nwhite bread | 1 | slice\nnot a line\nbutter | 0,5 | tbsp\nboiled egg | 2 | piece\nflour (not listed) | 1 | tsp\nbanana</think> | 1 | litre\n")
+        assertEquals(
+            listOf(
+                AiText.Item(2.0, "piece", "boiled egg"), AiText.Item(1.0, "slice", "white bread"), AiText.Item(0.5, "tbsp", "butter"),
+                AiText.Item(1.0, "tsp", "flour"), AiText.Item(1.0, "serving", "banana"),
+            ),
+            items,
+        )
     }
 
     @Test
@@ -70,6 +76,7 @@ class AiTextTest {
         assertEquals("Two eggs and a slice of toast.", AiText.heard("language English<asr_text>Two eggs and a slice of toast."))
         assertEquals("Two eggs.", AiText.heard("language English Two eggs."))
         assertEquals(listOf("fried egg", "baked beans", "toast"), AiText.names("fried egg\nbaked beans\n- toast\nfried egg\n"))
+        assertEquals(listOf("vegetables", "rice", "meat"), AiText.names("vegetables, rice, meat,\nvegetables, rice,"))
     }
 
     @Test

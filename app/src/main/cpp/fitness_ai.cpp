@@ -25,6 +25,9 @@ void init(const char * lib_dir) {
     llama_log_set([](enum ggml_log_level level, const char * text, void *) {
         if (level >= GGML_LOG_LEVEL_ERROR) fprintf(stderr, "%s", text);
     }, nullptr);
+    mtmd_helper_log_set([](enum ggml_log_level level, const char * text, void *) {
+        if (level >= GGML_LOG_LEVEL_ERROR) fprintf(stderr, "%s", text);
+    }, nullptr);
     if (lib_dir && *lib_dir) ggml_backend_load_all_from_path(lib_dir); else ggml_backend_load_all();
     llama_backend_init();
 }
@@ -141,8 +144,8 @@ std::string answer(Model * m, const std::string & prompt, const std::string & gr
         if (!g) { llama_sampler_free(smpl); llama_free(ctx); error = "bad grammar"; return ""; }
         llama_sampler_chain_add(smpl, g);
     }
-    // Free text (the weekly summary) is kept from going round in circles; held text needs no help.
-    if (grammar.empty()) llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.1f, 0.0f, 0.0f));
+    // Small models go round in circles: repeating what was just written is made less likely.
+    llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, grammar.empty() ? 1.1f : 1.15f, 0.0f, 0.0f));
     llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
 
     std::string out;

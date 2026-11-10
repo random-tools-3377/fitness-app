@@ -7,20 +7,28 @@ import kotlin.math.roundToInt
  * model only picks words; the numbers always come from the app's own food data.
  */
 object AiText {
-    /** One food the model named: "2 | piece | boiled egg". */
+    /** One food the model named: "boiled egg | 2 | piece". */
     data class Item(val amount: Double, val unit: String, val food: String)
 
-    /** The model's lines, in "amount | unit | food" form. Lines that aren't are left out. */
+    private val UNITS = setOf("g", "ml", "piece", "slice", "cup", "tbsp", "tsp", "bowl", "glass", "can", "bottle", "handful", "serving")
+
+    /**
+     * The model's lines, in "food | amount | unit" form. Lines that aren't are left out, and so is
+     * a food named again (small models sometimes go round in circles).
+     */
     fun items(text: String): List<Item> = text.lines().mapNotNull { line ->
         val parts = line.split('|').map { it.trim() }
-        if (parts.size != 3 || parts[2].isEmpty()) return@mapNotNull null
-        val amount = parts[0].replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
-        Item(amount, parts[1].lowercase(), parts[2])
-    }.take(15)
+        if (parts.size != 3) return@mapNotNull null
+        val food = parts[0].replace(Regex("""\s*\([^)]*\)?"""), "").replace(Regex("<[^>]*>"), "").trim()
+        if (food.isEmpty()) return@mapNotNull null
+        val amount = parts[1].replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
+        val unit = parts[2].lowercase().takeIf { it in UNITS } ?: "serving"
+        Item(amount, unit, food)
+    }.distinctBy { it.food.lowercase() }.take(12)
 
     /** Names, one per line, as the plate-photo model gives them; repeats left out. */
     fun names(text: String): List<String> =
-        text.lines().map { it.trim().trim(',', '.', '-', '*').trim() }.filter { it.length >= 2 }
+        text.split('\n', ',').map { it.trim().trim(',', '.', '-', '*').trim() }.filter { it.length >= 2 }
             .distinctBy { it.lowercase() }.take(8)
 
     /** What the speech model heard, without its "language English<asr_text>" opening. */

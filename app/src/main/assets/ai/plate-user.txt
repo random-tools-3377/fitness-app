@@ -1,1 +1,1 @@
-{media}Name each food on this plate, one per line, with no amounts. Use short plain names, like fried egg, baked beans or toast.
+{media}List the foods on this plate. Write one food on each line, each only once, with no amounts.
