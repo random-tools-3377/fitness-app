@@ -31,6 +31,11 @@ data class AppSettings(
     val fastHours: Double = 16.0,
     /** Foods starred by the user, by key ("b:S171705", "u:12"), first in the search (0.7.0). */
     val favourites: Set<String> = emptySet(),
+    /**
+     * Built-in foods the user replaced with their own copy (0.19.0): the built-in id to the id of
+     * the user's food. The built-in one is hidden from the lists while the copy is there.
+     */
+    val replacedBuiltIns: Map<String, Long> = emptyMap(),
     /** Daily targets for fibre, sugar, saturated fat and salt; off until set (0.7.0). */
     val extraTargets: ExtraTargets = ExtraTargets(),
     /** The weekly programme: a saved workout's id for each day it's on, 1 = Monday (0.9.0). */

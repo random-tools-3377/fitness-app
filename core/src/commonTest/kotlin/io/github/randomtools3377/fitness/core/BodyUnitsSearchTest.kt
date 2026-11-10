@@ -123,4 +123,21 @@ class BodyUnitsSearchTest {
         assertEquals(71.5, egg.nutrientsFor(Amount(1.0, "1 large")).kcal, 1e-9)
         assertTrue(list[1].portions.isEmpty())
     }
+
+    @Test
+    fun aBuiltInFoodWithTheUsersOwnCopyIsHiddenUntilTheCopyGoes() {
+        val per100 = Nutrients(250.0, 9.0, 45.0, 3.0, micros = mapOf("iron" to 2.0))
+        val bread = Food(builtInId = "S1", name = "Bread, white", per100 = per100, portions = listOf(Portion("1 slice", 29.0)))
+        val rice = Food(builtInId = "S2", name = "Rice", per100 = per100)
+        val copy = FoodSearch.copyOf(bread)
+        kotlin.test.assertNull(copy.builtInId)
+        assertEquals(bread.per100, copy.per100) // vitamins and minerals kept too
+        assertEquals(bread.portions, copy.portions)
+        val mine = copy.copy(id = 7, name = "Bread (local bakery)")
+        val replaced = mapOf("S1" to 7L)
+        assertEquals(listOf(rice), FoodSearch.visibleBuiltIns(listOf(bread, rice), replaced, listOf(mine)))
+        // Deleted (hidden) or gone: the built-in bread is back.
+        assertEquals(listOf(bread, rice), FoodSearch.visibleBuiltIns(listOf(bread, rice), replaced, listOf(mine.copy(hidden = true))))
+        assertEquals(listOf(bread, rice), FoodSearch.visibleBuiltIns(listOf(bread, rice), replaced, emptyList()))
+    }
 }
