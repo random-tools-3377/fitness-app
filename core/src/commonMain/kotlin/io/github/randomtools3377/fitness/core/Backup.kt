@@ -36,6 +36,10 @@ data class AppSettings(
      * the user's food. The built-in one is hidden from the lists while the copy is there.
      */
     val replacedBuiltIns: Map<String, Long> = emptyMap(),
+    /** What the user chose to log for each exercise, by its key, when not the usual (0.20.0). */
+    val exerciseTracks: Map<String, List<Track>> = emptyMap(),
+    /** Keep the screen on while a workout is open (0.20.0). */
+    val keepScreenOn: Boolean = false,
     /** Daily targets for fibre, sugar, saturated fat and salt; off until set (0.7.0). */
     val extraTargets: ExtraTargets = ExtraTargets(),
     /** The weekly programme: a saved workout's id for each day it's on, 1 = Monday (0.9.0). */

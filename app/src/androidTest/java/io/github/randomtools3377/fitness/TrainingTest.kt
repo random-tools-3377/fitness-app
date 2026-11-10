@@ -63,8 +63,9 @@ class TrainingTest {
         // +2.5 kg, or +5 lb where the phone uses pounds.
         app.waitFor { textIs("field:weight:0:0", "82.5", "85") }
 
-        // Tapping the set's number makes it a warm-up.
+        // The set's number opens its menu, which can make it a warm-up.
         app.tap("warmup:0:0")
+        app.tap("make-warmup:0:0")
         app.waitFor { textIs("warmup:0:0", "W") }
     }
 }

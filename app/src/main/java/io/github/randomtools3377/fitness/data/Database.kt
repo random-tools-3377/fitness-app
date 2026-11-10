@@ -239,6 +239,9 @@ data class WorkoutSetRow(
     /** Version 8 (0.9.0): a warm-up set, and the exercise's superset. */
     @androidx.room.ColumnInfo(defaultValue = "0") val warmUp: Boolean = false,
     val superset: Int? = null,
+    /** Version 11 (0.20.0): the set's own rest, and what is logged for the exercise. */
+    val restSeconds: Int? = null,
+    val track: String? = null,
 )
 
 @Entity(tableName = "saved_workouts")
@@ -266,6 +269,9 @@ data class SavedWorkoutItemRow(
     val sets: Int,
     /** Version 8 (0.9.0): the exercise's superset. */
     val superset: Int? = null,
+    /** Version 11 (0.20.0): what is logged for the exercise, and each set as planned (JSON). */
+    val track: String? = null,
+    val plan: String? = null,
 )
 
 /** How often and how lately each food was logged. */
@@ -536,6 +542,12 @@ interface FitnessDao {
     @Query("DELETE FROM saved_workouts WHERE id = :id")
     suspend fun deleteSavedWorkout(id: Long)
 
+    @androidx.room.Update
+    suspend fun updateSavedWorkout(row: SavedWorkoutRow)
+
+    @Query("DELETE FROM saved_workout_items WHERE savedId = :id")
+    suspend fun deleteSavedWorkoutItems(id: Long)
+
     @Query("DELETE FROM exercises") suspend fun clearExercises()
     @Query("DELETE FROM rest_times") suspend fun clearRestTimes()
     @Query("DELETE FROM workout_sets") suspend fun clearWorkoutSets()
@@ -567,9 +579,9 @@ interface FitnessDao {
         // Version 10 (0.12.0): cycle tracking.
         PeriodRow::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
@@ -642,8 +654,16 @@ fun WeighIn.toRow() = WeighInRow(id, day.toDay(), kg, at)
 
 fun ExerciseRow.toCore() = Exercises.own(id, name, ExerciseKind.valueOf(kind))
 
-private fun exerciseOf(key: String, name: String, kind: String, met: Double, muscle: String, cardio: String) =
-    Exercise(key, name, ExerciseKind.valueOf(kind), met, muscle, CardioType.valueOf(cardio))
+private fun exerciseOf(key: String, name: String, kind: String, met: Double, muscle: String, cardio: String, track: String? = null) =
+    Exercise(
+        key, name, ExerciseKind.valueOf(kind), met, muscle, CardioType.valueOf(cardio),
+        track = io.github.randomtools3377.fitness.core.Track.decode(track),
+        secondsPerRep = Exercises.builtIn(key)?.secondsPerRep ?: Exercises.SECONDS_PER_REP,
+    )
+
+private fun planOf(text: String?): List<WorkoutSet> = io.github.randomtools3377.fitness.core.Workouts.decodePlan(text)
+
+private fun planText(plan: List<WorkoutSet>): String? = io.github.randomtools3377.fitness.core.Workouts.encodePlan(plan)
 
 fun workoutsOf(rows: List<WorkoutRow>, sets: List<WorkoutSetRow>): List<Workout> {
     val byWorkout = sets.groupBy { it.workoutId }
@@ -651,8 +671,8 @@ fun workoutsOf(rows: List<WorkoutRow>, sets: List<WorkoutSetRow>): List<Workout>
         val exercises = byWorkout[r.id].orEmpty().groupBy { it.position }.toSortedMap().values.map { list ->
             val f = list.first()
             WorkoutExercise(
-                exerciseOf(f.exerciseKey, f.exerciseName, f.kind, f.met, f.muscle, f.cardio),
-                list.sortedBy { it.setIndex }.map { WorkoutSet(it.weightKg, it.reps, it.seconds, it.distanceKm, it.done, it.doneAt, it.warmUp) },
+                exerciseOf(f.exerciseKey, f.exerciseName, f.kind, f.met, f.muscle, f.cardio, f.track),
+                list.sortedBy { it.setIndex }.map { WorkoutSet(it.weightKg, it.reps, it.seconds, it.distanceKm, it.done, it.doneAt, it.warmUp, it.restSeconds) },
                 f.superset,
             )
         }
@@ -669,7 +689,8 @@ fun Workout.setRows(workoutId: Long): List<WorkoutSetRow> = exercises.flatMapInd
             exerciseKey = we.exercise.key, exerciseName = we.exercise.name, kind = we.exercise.kind.name, met = we.exercise.met,
             muscle = we.exercise.muscle, cardio = we.exercise.cardio.name,
             weightKg = s.weightKg, reps = s.reps, seconds = s.seconds, distanceKm = s.distanceKm, done = s.done, doneAt = s.doneAt,
-            warmUp = s.warmUp, superset = we.superset,
+            warmUp = s.warmUp, superset = we.superset, restSeconds = s.restSeconds,
+            track = io.github.randomtools3377.fitness.core.Track.encode(we.exercise.track),
         )
     }
 }
@@ -680,7 +701,7 @@ fun savedWorkoutsOf(rows: List<SavedWorkoutRow>, items: List<SavedWorkoutItemRow
         SavedWorkout(
             r.id, r.name,
             bySaved[r.id].orEmpty().sortedBy { it.position }.map {
-                SavedWorkoutItem(exerciseOf(it.exerciseKey, it.exerciseName, it.kind, it.met, it.muscle, it.cardio), it.sets, it.superset)
+                SavedWorkoutItem(exerciseOf(it.exerciseKey, it.exerciseName, it.kind, it.met, it.muscle, it.cardio, it.track), it.sets, it.superset, planOf(it.plan))
             },
             r.createdAt,
         )
@@ -691,6 +712,7 @@ fun SavedWorkout.itemRows(savedId: Long) = items.mapIndexed { i, it ->
     SavedWorkoutItemRow(
         savedId = savedId, position = i, exerciseKey = it.exercise.key, exerciseName = it.exercise.name, kind = it.exercise.kind.name,
         met = it.exercise.met, muscle = it.exercise.muscle, cardio = it.exercise.cardio.name, sets = it.sets, superset = it.superset,
+        track = io.github.randomtools3377.fitness.core.Track.encode(it.exercise.track), plan = planText(it.plan),
     )
 }
 

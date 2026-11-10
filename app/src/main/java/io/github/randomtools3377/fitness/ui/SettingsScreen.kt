@@ -114,6 +114,13 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
                 }
                 Switch(checked = settings.burnedHalf, onCheckedChange = { vm.setBurnedHalf(it) }, modifier = Modifier.testTag("burned-half"))
             }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Keep the screen on during a workout")
+                    Text("While the workout screen is open, so the timers stay in sight. Uses more battery.", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.keepScreenOn, onCheckedChange = { v -> vm.updateSettingsNow { it.copy(keepScreenOn = v) } }, modifier = Modifier.testTag("keep-screen-on"))
+            }
             WorkoutsPerWeekRow(vm, settings)
             if (on(io.github.randomtools3377.fitness.core.Feature.TRAINING_EXTRAS)) PlatesRow(vm, settings)
         }
