@@ -28,7 +28,8 @@ object AiText {
 
     /** Names, one per line, as the plate-photo model gives them; repeats left out. */
     fun names(text: String): List<String> =
-        text.split('\n', ',').map { it.trim().trim(',', '.', '-', '*').trim() }.filter { it.length >= 2 }
+        text.split('\n', ',').map { it.trim().trim(',', '.', '-', '*').trim().removePrefix("and ").removeSuffix(" and").trim() }
+            .filter { it.length >= 2 && it.lowercase() != "and" }
             .distinctBy { it.lowercase() }.take(8)
 
     /** What the speech model heard, without its "language English<asr_text>" opening. */

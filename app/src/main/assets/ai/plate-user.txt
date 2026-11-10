@@ -1,1 +1,1 @@
-{media}List the foods on this plate. Write one food on each line, each only once, with no amounts.
+{media}What foods are on this plate? Write each food on its own line, in one to three words, with no amounts. Only foods you can see.
