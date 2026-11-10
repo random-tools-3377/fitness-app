@@ -191,7 +191,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     fun addSet(index: Int) = change { w ->
         w.copy(
             exercises = w.exercises.mapIndexed { i, we ->
-                if (i != index) we else we.copy(sets = we.sets + (we.sets.lastOrNull()?.copy(done = false, doneAt = null) ?: WorkoutSet()))
+                if (i != index) we else we.copy(sets = Workouts.resize(we.sets, we.sets.size + 1))
             },
         )
     }
@@ -208,8 +208,40 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /** Sets of exercise [index] made [n] long (0.21.0). */
+    fun setCount(index: Int, n: Int) = change { w ->
+        w.copy(exercises = w.exercises.mapIndexed { i, we -> if (i == index) we.copy(sets = Workouts.resize(we.sets, n.coerceIn(1, 30))) else we })
+    }
+
+    /** [f] applied to every set of exercise [index] not yet ticked (0.21.0). */
+    fun updateOpen(index: Int, f: (WorkoutSet) -> WorkoutSet) = change { w ->
+        w.copy(exercises = w.exercises.mapIndexed { i, we -> if (i == index) we.copy(sets = Workouts.open(we.sets, f)) else we })
+    }
+
+    /** One circuit for every exercise, or none (0.21.0). */
+    fun allOneCircuit(on: Boolean) = change { w ->
+        val g = io.github.randomtools3377.fitness.core.Supersets.allOne(w.exercises.size, on)
+        w.copy(exercises = w.exercises.mapIndexed { i, we -> we.copy(superset = g[i]) })
+    }
+
+    fun moveCircuit(index: Int, by: Int) = change { w -> w.copy(exercises = Supersets.move(w.exercises, index, by, whole = true)) }
+
+    /**
+     * Ticks one set of each exercise in circuit [group] (0.21.0), with the reps typed for those
+     * till failure, then starts one rest.
+     */
+    fun roundDone(group: Int, reps: Map<Pair<Int, Int>, Int?> = emptyMap()) {
+        val w = current.value ?: return
+        val round = Workouts.round(w, group)
+        if (round.isEmpty()) return
+        for ((i, j) in round) tick(i, j, reps[i to j], rest = false)
+        val (li, lj) = round.last()
+        val last = w.exercises[li]
+        if (!last.exercise.long) RestTimer.start(context, last.sets[lj].restSeconds ?: restFor(last.exercise.key), "Circuit")
+    }
+
     /** Ticks a set (or unticks it). Ticking starts the rest timer and checks for personal bests. */
-    fun tick(index: Int, setIndex: Int) {
+    fun tick(index: Int, setIndex: Int, reps: Int? = null, rest: Boolean = true) {
         val w = current.value ?: return
         val we = w.exercises.getOrNull(index) ?: return
         val s = we.sets.getOrNull(setIndex) ?: return
@@ -217,7 +249,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             updateSet(index, setIndex) { it.copy(done = false, doneAt = null) }
             return
         }
-        val doneSet = s.copy(done = true, doneAt = now())
+        val doneSet = s.copy(done = true, doneAt = now(), reps = reps ?: s.reps)
         // Compared with every earlier workout and the sets already ticked in this one.
         val sofar = w.copy(
             endedAt = w.startedAt,
@@ -228,7 +260,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         if (beaten.isNotEmpty()) celebration.value = beaten
         // In a superset, the rest comes after the last exercise of the round (0.9.0).
         // Each set can have its own rest (0.20.0); long ones, logged in minutes, have none.
-        if (!we.exercise.long && Supersets.restAfter(w, index)) {
+        if (rest && !we.exercise.long && Supersets.restAfter(w, index)) {
             RestTimer.start(context, s.restSeconds ?: restFor(we.exercise.key), we.exercise.name)
         }
     }

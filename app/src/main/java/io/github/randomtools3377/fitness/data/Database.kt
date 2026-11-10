@@ -242,6 +242,8 @@ data class WorkoutSetRow(
     /** Version 11 (0.20.0): the set's own rest, and what is logged for the exercise. */
     val restSeconds: Int? = null,
     val track: String? = null,
+    /** Version 12 (0.21.0): reps till failure. */
+    @androidx.room.ColumnInfo(defaultValue = "0") val toFailure: Boolean = false,
 )
 
 @Entity(tableName = "saved_workouts")
@@ -579,9 +581,9 @@ interface FitnessDao {
         // Version 10 (0.12.0): cycle tracking.
         PeriodRow::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6), AutoMigration(from = 6, to = 7), AutoMigration(from = 7, to = 8), AutoMigration(from = 8, to = 9), AutoMigration(from = 9, to = 10), AutoMigration(from = 10, to = 11), AutoMigration(from = 11, to = 12)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FitnessDao
@@ -672,7 +674,7 @@ fun workoutsOf(rows: List<WorkoutRow>, sets: List<WorkoutSetRow>): List<Workout>
             val f = list.first()
             WorkoutExercise(
                 exerciseOf(f.exerciseKey, f.exerciseName, f.kind, f.met, f.muscle, f.cardio, f.track),
-                list.sortedBy { it.setIndex }.map { WorkoutSet(it.weightKg, it.reps, it.seconds, it.distanceKm, it.done, it.doneAt, it.warmUp, it.restSeconds) },
+                list.sortedBy { it.setIndex }.map { WorkoutSet(it.weightKg, it.reps, it.seconds, it.distanceKm, it.done, it.doneAt, it.warmUp, it.restSeconds, it.toFailure) },
                 f.superset,
             )
         }
@@ -689,7 +691,7 @@ fun Workout.setRows(workoutId: Long): List<WorkoutSetRow> = exercises.flatMapInd
             exerciseKey = we.exercise.key, exerciseName = we.exercise.name, kind = we.exercise.kind.name, met = we.exercise.met,
             muscle = we.exercise.muscle, cardio = we.exercise.cardio.name,
             weightKg = s.weightKg, reps = s.reps, seconds = s.seconds, distanceKm = s.distanceKm, done = s.done, doneAt = s.doneAt,
-            warmUp = s.warmUp, superset = we.superset, restSeconds = s.restSeconds,
+            warmUp = s.warmUp, superset = we.superset, restSeconds = s.restSeconds, toFailure = s.toFailure,
             track = io.github.randomtools3377.fitness.core.Track.encode(we.exercise.track),
         )
     }
