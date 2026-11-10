@@ -376,8 +376,11 @@ Decided on 2026-11-09: AI features are added, on these terms.
     read the numbers beside it.
   - On the Features page under "AI on this phone", each with its download size, and a note when
     a phone is likely too slow.
-  - Build order: 0.16.0 better label reading; 0.17.0 describing a meal, pasting a recipe and the
-    weekly summary; 0.18.0 voice; 0.19.0 plate photos.
+  - Voice needs the microphone, asked the first time the user taps "Say it"; recordings stay in
+    memory and are never saved.
+  - Build order: 0.16.0 better label reading; then, after the look (0.17.0), 0.18.0 everything
+    else at once (describing a meal, voice, plate photos, pasting a recipe and the weekly
+    summary), so it can be tried together.
 
 ## The look, like the checklist app
 
