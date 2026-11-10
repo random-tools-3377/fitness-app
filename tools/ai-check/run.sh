@@ -34,8 +34,8 @@ fetch() {
   fi
 }
 
-ask() {  # ask MODEL MMPROJ SYSTEM USER GRAMMAR MEDIA MAX PREFIX
-  "$work/build/ai-check" "$@" 2>&1 | grep -v "^\s*$" || true
+ask() {  # ask MODEL MMPROJ SYSTEM USER GRAMMAR MEDIA MAX PREFIX (at most 5 minutes each)
+  timeout 300 "$work/build/ai-check" "$@" 2>&1 | grep -v "^\s*$" || echo "(no answer within 5 minutes)"
 }
 
 if [ "$step" = "probe" ]; then
@@ -43,7 +43,9 @@ if [ "$step" = "probe" ]; then
   exit 0
 fi
 
+SECONDS=0
 build
+echo "[built in ${SECONDS} s]"
 cases="$here/cases"
 
 if [ "$step" = "all" ] || [ "$step" = "text" ]; then

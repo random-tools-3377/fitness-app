@@ -1,5 +1,5 @@
-root   ::= item item? item? item? item? item? item? item? item? item? item? item? item? item? item?
+root   ::= item{1,15}
 item   ::= amount " | " unit " | " food "\n"
-amount ::= [0-9] [0-9]? [0-9]? [0-9]? ("." [0-9] [0-9]?)?
+amount ::= [0-9]{1,4} ("." [0-9]{1,2})?
 unit   ::= "g" | "ml" | "piece" | "slice" | "cup" | "tbsp" | "tsp" | "bowl" | "glass" | "can" | "bottle" | "handful" | "serving"
-food   ::= [^|\n] [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]? [^|\n]?
+food   ::= [^|\n]{1,40}
