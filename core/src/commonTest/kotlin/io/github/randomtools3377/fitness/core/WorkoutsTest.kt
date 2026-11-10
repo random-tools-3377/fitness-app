@@ -187,6 +187,8 @@ class WorkoutsTest {
         val saved = Workouts.saveAs("Again", did, 0)
         assertEquals(listOf(22, 21), saved.items[0].plan.map { it.reps })
         assertTrue(saved.items[0].plan.none { it.done })
+        assertEquals(plan, Workouts.decodePlan(Workouts.encodePlan(plan)))
+        assertEquals(emptyList(), Workouts.decodePlan(null))
     }
 
     @Test

@@ -410,6 +410,15 @@ object Workouts {
         return bits.joinToString(", ").ifEmpty { "—" }
     }
 
+    private val planJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+    private val planSerializer = kotlinx.serialization.builtins.ListSerializer(WorkoutSet.serializer())
+
+    /** A saved workout's planned sets as text for the database (0.20.0); null when there are none. */
+    fun encodePlan(plan: List<WorkoutSet>): String? = if (plan.isEmpty()) null else planJson.encodeToString(planSerializer, plan)
+
+    fun decodePlan(text: String?): List<WorkoutSet> =
+        text?.let { runCatching { planJson.decodeFromString(planSerializer, it) }.getOrNull() }.orEmpty()
+
     /** 75 → "1:15", 3725 → "1:02:05". */
     fun clock(seconds: Int): String {
         val h = seconds / 3600

@@ -661,13 +661,9 @@ private fun exerciseOf(key: String, name: String, kind: String, met: Double, mus
         secondsPerRep = Exercises.builtIn(key)?.secondsPerRep ?: Exercises.SECONDS_PER_REP,
     )
 
-private val planJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+private fun planOf(text: String?): List<WorkoutSet> = io.github.randomtools3377.fitness.core.Workouts.decodePlan(text)
 
-private fun planOf(text: String?): List<WorkoutSet> =
-    text?.let { runCatching { planJson.decodeFromString(kotlinx.serialization.builtins.ListSerializer(WorkoutSet.serializer()), it) }.getOrNull() }.orEmpty()
-
-private fun planText(plan: List<WorkoutSet>): String? =
-    if (plan.isEmpty()) null else planJson.encodeToString(kotlinx.serialization.builtins.ListSerializer(WorkoutSet.serializer()), plan)
+private fun planText(plan: List<WorkoutSet>): String? = io.github.randomtools3377.fitness.core.Workouts.encodePlan(plan)
 
 fun workoutsOf(rows: List<WorkoutRow>, sets: List<WorkoutSetRow>): List<Workout> {
     val byWorkout = sets.groupBy { it.workoutId }
