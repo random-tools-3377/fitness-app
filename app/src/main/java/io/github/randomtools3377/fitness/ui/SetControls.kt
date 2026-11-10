@@ -41,10 +41,10 @@ fun Stepper(text: String, label: String, tag: String, onMinus: (() -> Unit)?, on
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedIconButton(onClick = { onMinus?.invoke() }, enabled = onMinus != null, modifier = Modifier.testTag("minus:$tag")) { Text("−") }
         Column(
-            Modifier.widthIn(min = 44.dp).clickable(enabled = onTap != null) { onTap?.invoke() }.padding(horizontal = 4.dp),
+            Modifier.widthIn(min = 44.dp).clickable(enabled = onTap != null) { onTap?.invoke() }.padding(horizontal = 4.dp).testTag("all:$tag"),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(text, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, modifier = Modifier.testTag("all:$tag"))
+            Text(text, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, modifier = Modifier.testTag("value:$tag"))
             Text(label, style = MaterialTheme.typography.labelSmall)
         }
         OutlinedIconButton(onClick = { onPlus?.invoke() }, enabled = onPlus != null, modifier = Modifier.testTag("plus:$tag")) { Text("+") }

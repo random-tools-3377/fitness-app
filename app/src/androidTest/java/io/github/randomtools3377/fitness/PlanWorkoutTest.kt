@@ -68,7 +68,7 @@ class PlanWorkoutTest {
         app.tap("all:reps:plan:0")
         app.onNodeWithTag("field:value").performTextInput("20")
         app.tap("save-value")
-        app.waitFor { textIs("all:reps:plan:0", "20") }
+        app.waitFor { textIs("value:reps:plan:0", "20") }
         app.tap("plan-add-exercise")
         pick("Push-up", "push-up")
         app.waitFor { !gone("plan-menu:0") }
@@ -80,9 +80,9 @@ class PlanWorkoutTest {
         app.waitFor { !gone("start:Circuit") }
         app.onNodeWithTag("start:Circuit").performClick()
         app.waitFor { !gone("all:reps:0") }
-        app.waitFor { textIs("all:reps:0", "20") }
+        app.waitFor { textIs("value:reps:0", "20") }
         app.tap("plus:reps:1")
-        app.waitFor { textIs("all:reps:1", "1") }
+        app.waitFor { textIs("value:reps:1", "1") }
 
         // One set of each, then rest.
         app.tap("tick:0:0")
