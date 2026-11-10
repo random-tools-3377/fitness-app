@@ -76,10 +76,8 @@ if [ "$step" = "all" ] || [ "$step" = "speech" ]; then
   while IFS= read -r line; do
     [ -z "$line" ] && continue
     espeak-ng -v en-gb -s 150 -w "$work/said.wav" "$line"
-    # 16 kHz mono, as the phone records it.
-    ffmpeg -loglevel error -y -i "$work/said.wav" -ar 16000 -ac 1 "$work/said16.wav"
     echo "--- said: $line"
-    ask "$work/models/$SPEECH_FILE" "$work/models/$SPEECH_MMPROJ" /dev/null "$assets/speech-user.txt" - "$work/said16.wav" 120 -
+    ask "$work/models/$SPEECH_FILE" "$work/models/$SPEECH_MMPROJ" /dev/null "$assets/speech-user.txt" - "$work/said.wav" 120 -
   done < "$cases/spoken.txt"
 fi
 
