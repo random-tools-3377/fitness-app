@@ -78,6 +78,7 @@ class AiTextTest {
         assertEquals(listOf("fried egg", "baked beans", "toast"), AiText.names("fried egg\nbaked beans\n- toast\nfried egg\n"))
         assertEquals(listOf("vegetables", "rice", "meat"), AiText.names("vegetables, rice, meat,\nvegetables, rice,"))
         assertEquals(listOf("fish", "chips", "peas"), AiText.names("fish\nand chips\npeas and\nand\n"))
+        assertEquals(listOf("Spaghetti", "peas", "broccoli"), AiText.names("Spaghetti with peas, broccoli on plate\nplate"))
     }
 
     @Test

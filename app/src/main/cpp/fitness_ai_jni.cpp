@@ -64,11 +64,11 @@ JNIEXPORT void JNICALL Java_io_github_randomtools3377_fitness_ai_NativeAi_unload
     fitai::unload((fitai::Model *) m);
 }
 
-JNIEXPORT jstring JNICALL Java_io_github_randomtools3377_fitness_ai_NativeAi_format(JNIEnv * env, jobject, jlong m, jstring system, jstring user) {
+JNIEXPORT jstring JNICALL Java_io_github_randomtools3377_fitness_ai_NativeAi_format(JNIEnv * env, jobject, jlong m, jstring system, jstring user, jstring examples) {
     std::string u = str(env, user);
     size_t at = u.find("{media}");
     if (at != std::string::npos) u.replace(at, 7, fitai::media_marker());
-    return jstr(env, fitai::format((fitai::Model *) m, str(env, system), u));
+    return jstr(env, fitai::format((fitai::Model *) m, str(env, system), u, str(env, examples)));
 }
 
 JNIEXPORT jstring JNICALL Java_io_github_randomtools3377_fitness_ai_NativeAi_answer(JNIEnv * env, jobject, jlong m, jstring prompt, jstring grammar, jint max_tokens, jbyteArray media) {

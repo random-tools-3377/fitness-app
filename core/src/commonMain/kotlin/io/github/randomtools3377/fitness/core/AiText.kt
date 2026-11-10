@@ -28,9 +28,13 @@ object AiText {
 
     /** Names, one per line, as the plate-photo model gives them; repeats left out. */
     fun names(text: String): List<String> =
-        text.split('\n', ',').map { it.trim().trim(',', '.', '-', '*').trim().removePrefix("and ").removeSuffix(" and").trim() }
-            .filter { it.length >= 2 && it.lowercase() != "and" }
+        text.split(Regex("""\n|,|;|\band\b|\bwith\b""", RegexOption.IGNORE_CASE))
+            .map { it.trim().trim('.', '-', '*').trim().removePrefix("a ").removePrefix("an ").removePrefix("some ").trim()
+                .replace(Regex("""\s+on (a |the )?(plate|table)$""", RegexOption.IGNORE_CASE), "") }
+            .filter { it.length >= 2 && it.lowercase() !in NOT_FOOD && !it.lowercase().startsWith("on ") }
             .distinctBy { it.lowercase() }.take(8)
+
+    private val NOT_FOOD = setOf("plate", "a plate", "bowl", "table", "food", "dish", "meal", "fork", "knife", "spoon")
 
     /** What the speech model heard, without its "language English<asr_text>" opening. */
     fun heard(text: String): String {

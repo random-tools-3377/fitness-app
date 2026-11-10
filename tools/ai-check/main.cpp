@@ -1,5 +1,5 @@
 // The AI check's tool, asking a model the same way the app does:
-//   ai-check MODEL MMPROJ|- SYSTEM_FILE USER_FILE [GRAMMAR_FILE|-] [MEDIA_FILE|-] [MAX_TOKENS] [PREFIX_FILE|-]
+//   ai-check MODEL MMPROJ|- SYSTEM_FILE USER_FILE [GRAMMAR_FILE|-] [MEDIA_FILE|-] [MAX_TOKENS] [PREFIX_FILE|-] [EXAMPLES_FILE|-]
 // "{media}" in the user message is where the photo or recording goes. Prints the answer, and on
 // the error stream how long loading and answering took.
 #include <chrono>
@@ -31,6 +31,7 @@ int main(int argc, char ** argv) {
     std::string media = argc > 6 ? slurp(argv[6]) : "";
     int max_tokens = argc > 7 ? atoi(argv[7]) : 200;
     std::string prefix = argc > 8 ? slurp(argv[8]) : "";
+    std::string examples = argc > 9 ? slurp(argv[9]) : "";
     fitai::init(nullptr);
     auto t0 = std::chrono::steady_clock::now();
     fitai::Model * m = fitai::load(argv[1], mmproj == "-" ? nullptr : mmproj.c_str(), 4096, 4);
@@ -38,7 +39,7 @@ int main(int argc, char ** argv) {
     auto t1 = std::chrono::steady_clock::now();
     size_t at = user.find("{media}");
     if (at != std::string::npos) user.replace(at, 7, fitai::media_marker());
-    std::string prompt = fitai::format(m, system, user) + prefix;
+    std::string prompt = fitai::format(m, system, user, examples) + prefix;
     std::string error;
     std::string out = fitai::answer(m, prompt, grammar, max_tokens,
                                     media.empty() ? nullptr : (const unsigned char *) media.data(), media.size(), nullptr, error);

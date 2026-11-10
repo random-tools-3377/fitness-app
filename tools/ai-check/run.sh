@@ -65,11 +65,11 @@ if [ "$step" = "all" ] || [ "$step" = "text" ]; then
     [ -z "$line" ] && continue
     printf '%s' "$line" > "$work/user.txt"
     echo "--- $line"
-    ask "$m" - "$assets/meal-system.txt" "$work/user.txt" "$assets/meal.gbnf" - 300 "$assets/qwen3-prefix.txt"
+    ask "$m" - "$assets/meal-system.txt" "$work/user.txt" "$assets/meal.gbnf" - 300 "$assets/qwen3-prefix.txt" "$assets/meal-examples.txt"
   done < "$cases/meals.txt"
   for r in "$cases"/recipe-*.txt; do
     echo "===== Recipe $(basename "$r")"
-    ask "$m" - "$assets/recipe-system.txt" "$r" "$assets/meal.gbnf" - 600 "$assets/qwen3-prefix.txt"
+    ask "$m" - "$assets/recipe-system.txt" "$r" "$assets/meal.gbnf" - 600 "$assets/qwen3-prefix.txt" "$assets/recipe-examples.txt"
   done
   for w in "$cases"/week-*.txt; do
     echo "===== Week $(basename "$w")"
@@ -97,7 +97,7 @@ if [ "$step" = "all" ] || [ "$step" = "plate" ]; then
   python3 "$here/plates.py" "$work/plates"
   for p in "$work"/plates/*.jpg; do
     echo "--- $(basename "$p")"
-    ask "$work/models/$PLATE_FILE" "$work/models/$PLATE_MMPROJ" "$assets/plate-system.txt" "$assets/plate-user.txt" "$assets/plate.gbnf" "$p" 80 -
+    ask "$work/models/$PLATE_FILE" "$work/models/$PLATE_MMPROJ" "$assets/plate-system.txt" "$assets/plate-user.txt" - "$p" 60 -
   done
 fi
 

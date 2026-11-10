@@ -58,21 +58,21 @@ object AiFoods {
 
     /** "two eggs and a slice of toast" as foods. */
     suspend fun fromText(context: Context, text: String, pool: Pool): List<Row> {
-        val answer = LocalAi.ask(context, "text", "meal-system.txt", null, text.trim(), "meal.gbnf", 300, prefix = "qwen3-prefix.txt")
+        val answer = LocalAi.ask(context, "text", "meal-system.txt", null, text.trim(), "meal.gbnf", 300, prefix = "qwen3-prefix.txt", examples = "meal-examples.txt")
         return withContext(Dispatchers.Default) { rows(AiText.items(answer), pool) }
     }
 
     /** A pasted recipe: its name, servings and method, and its ingredients as foods. */
     suspend fun fromRecipe(context: Context, text: String, pool: Pool): Pair<AiText.RecipeParts, List<Row>> {
         val parts = AiText.recipeParts(text)
-        val answer = LocalAi.ask(context, "text", "recipe-system.txt", null, text.trim().take(6000), "meal.gbnf", 600, prefix = "qwen3-prefix.txt")
+        val answer = LocalAi.ask(context, "text", "recipe-system.txt", null, text.trim().take(6000), "meal.gbnf", 600, prefix = "qwen3-prefix.txt", examples = "recipe-examples.txt")
         return parts to withContext(Dispatchers.Default) { rows(AiText.items(answer), pool) }
     }
 
     /** The foods on a photo of a plate, each as one serving for the user to change. */
     suspend fun fromPlate(context: Context, photo: Uri, pool: Pool): List<Row> {
         val jpeg = withContext(Dispatchers.IO) { smallJpeg(context, photo) } ?: throw LocalAi.Unavailable("That photo couldn't be read.")
-        val answer = LocalAi.ask(context, "plate", "plate-system.txt", "plate-user.txt", "", "plate.gbnf", 80, media = jpeg)
+        val answer = LocalAi.ask(context, "plate", "plate-system.txt", "plate-user.txt", "", null, 60, media = jpeg)
         return withContext(Dispatchers.Default) { rows(AiText.names(answer).map { AiText.Item(1.0, "serving", it) }, pool) }
     }
 

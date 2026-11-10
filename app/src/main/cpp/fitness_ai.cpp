@@ -65,12 +65,42 @@ void unload(Model * m) {
 
 const char * media_marker() { return mtmd_default_marker(); }
 
-std::string format(Model * m, const std::string & system, const std::string & user) {
+static std::vector<std::string> split(const std::string & text, const std::string & sep) {
+    std::vector<std::string> out;
+    size_t start = 0;
+    while (true) {
+        size_t at = text.find(sep, start);
+        out.push_back(text.substr(start, at == std::string::npos ? std::string::npos : at - start));
+        if (at == std::string::npos) break;
+        start = at + sep.size();
+    }
+    return out;
+}
+
+static std::string trim(const std::string & s) {
+    size_t a = s.find_first_not_of(" \n\r\t");
+    size_t b = s.find_last_not_of(" \n\r\t");
+    return a == std::string::npos ? "" : s.substr(a, b - a + 1);
+}
+
+std::string format(Model * m, const std::string & system, const std::string & user, const std::string & examples) {
     const char * tmpl = llama_model_chat_template(m->model, nullptr);
+    std::vector<std::pair<std::string, std::string>> turns;
+    if (!system.empty()) turns.push_back({"system", system});
+    if (!trim(examples).empty()) {
+        for (const auto & pair : split(examples, "\n=====\n")) {
+            auto qa = split(pair, "\n-----\n");
+            if (qa.size() != 2) continue;
+            turns.push_back({"user", trim(qa[0])});
+            turns.push_back({"assistant", trim(qa[1]) + "\n"});
+        }
+    }
+    turns.push_back({"user", user});
     std::vector<llama_chat_message> msgs;
-    if (!system.empty()) msgs.push_back({"system", system.c_str()});
-    msgs.push_back({"user", user.c_str()});
-    std::vector<char> buf(4096 + system.size() + user.size());
+    for (const auto & t : turns) msgs.push_back({t.first.c_str(), t.second.c_str()});
+    size_t total = 4096;
+    for (const auto & t : turns) total += t.second.size() + 64;
+    std::vector<char> buf(total);
     int n = llama_chat_apply_template(tmpl, msgs.data(), msgs.size(), true, buf.data(), (int32_t) buf.size());
     if (n > (int) buf.size()) {
         buf.resize(n);

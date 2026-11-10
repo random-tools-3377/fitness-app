@@ -19,9 +19,12 @@ Model * load(const char * model_path, const char * mmproj_path, int n_ctx, int n
 
 void unload(Model * m);
 
-// The chat template's text for a system and a user message, ready for the model's answer. The
-// user message holds the media marker where a photo or a recording goes.
-std::string format(Model * m, const std::string & system, const std::string & user);
+// The chat template's text for a system message, worked examples, and the user's message, ready
+// for the model's answer. [examples] holds pairs of a question and its answer, each pair
+// separated by a line "=====" and the question from the answer by a line "-----"; small models
+// follow examples given as earlier turns of the chat far better than examples in the system
+// message. The user message holds the media marker where a photo or a recording goes.
+std::string format(Model * m, const std::string & system, const std::string & user, const std::string & examples = "");
 
 // The marker that stands for a photo or a recording in a prompt.
 const char * media_marker();

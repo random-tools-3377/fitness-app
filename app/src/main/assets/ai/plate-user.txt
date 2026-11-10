@@ -1,1 +1,1 @@
-{media}What foods are on this plate? Write each food on its own line, in one to three words, with no amounts. Only foods you can see.
+{media}Which foods are on this plate? Answer with a short list of the foods only, separated by commas.

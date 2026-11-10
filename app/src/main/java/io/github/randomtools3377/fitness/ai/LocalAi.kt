@@ -77,13 +77,14 @@ object LocalAi {
         maxTokens: Int = 300,
         media: ByteArray? = null,
         prefix: String? = null,
+        examples: String? = null,
     ): String = withContext(Dispatchers.Default) {
         lock.withLock {
             start(context)
             use(context, id)
             val sys = system?.let { asset(context, it) }.orEmpty()
             val usr = user?.let { asset(context, it).replace("{text}", text) } ?: text
-            val prompt = NativeAi.format(handle, sys, usr) + (prefix?.let { asset(context, it) }.orEmpty())
+            val prompt = NativeAi.format(handle, sys, usr, examples?.let { asset(context, it) }.orEmpty()) + (prefix?.let { asset(context, it) }.orEmpty())
             NativeAi.answer(handle, prompt, grammar?.let { asset(context, it) }.orEmpty(), maxTokens, media)
         }
     }
