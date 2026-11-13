@@ -81,6 +81,8 @@ data class Food(
     val hidden: Boolean = false,
     /** The barcode of a typed-in food, so scanning it again finds it (0.3.0). */
     val barcode: String? = null,
+    /** A built-in food's type, one of [FoodTypes] (0.22.0); null for the user's own. */
+    val category: String? = null,
 ) {
     /** The same food is the same key, whether typed in or built in. */
     val key: String get() = builtInId?.let { "b:$it" } ?: "u:$id"
@@ -165,4 +167,34 @@ object PortionText {
 
     fun encode(portions: List<Portion>): String = json.encodeToString(serializer, portions)
     fun decode(text: String): List<Portion> = if (text.isBlank()) emptyList() else json.decodeFromString(serializer, text)
+}
+
+/**
+ * The food types the search can be narrowed to (0.22.0), as tools/build-food-list.py works them
+ * out from each food table's own groups. Only built-in foods have one.
+ */
+object FoodTypes {
+    val ALL: List<Pair<String, String>> = listOf(
+        "dishes" to "Meals and dishes",
+        "meat" to "Meat",
+        "fish" to "Fish and seafood",
+        "eggs" to "Eggs",
+        "dairy" to "Milk, cheese, yoghurt",
+        "legumes" to "Beans and lentils",
+        "nuts" to "Nuts and seeds",
+        "veg" to "Vegetables",
+        "fruit" to "Fruit",
+        "grains" to "Rice, pasta, grains",
+        "bread" to "Bread and crackers",
+        "breakfast" to "Breakfast cereals",
+        "fats" to "Oils and butter",
+        "sweets" to "Sweets and desserts",
+        "snacks" to "Snacks",
+        "drinks" to "Drinks",
+        "sauces" to "Sauces and spices",
+        "baby" to "Baby food",
+        "other" to "Other",
+    )
+
+    fun title(key: String): String = ALL.firstOrNull { it.first == key }?.second ?: key
 }

@@ -72,11 +72,14 @@ object FoodSearch {
         now: Long,
         limit: Int = 100,
         favourites: Set<String> = emptySet(),
+        type: String? = null,
+        prefer: String? = null,
     ): List<Food> {
         val q = words(query)
-        if (q.isEmpty()) return emptyList()
+        if (q.isEmpty()) return if (type != null) ofType(type, foods, usages, now, favourites, prefer, limit) else emptyList()
         val first = q.first()
         return foods.asSequence()
+            .filter { type == null || it.category == type }
             .filter { matches(it, query) }
             .map { food ->
                 val nameWords = words(food.name)
@@ -84,6 +87,8 @@ object FoodSearch {
                 if (food.key in favourites) score += 10_000.0
                 usages[food.key]?.let { score += 1000.0 + 100.0 * usageScore(it, now) }
                 if (food.builtInId == null) score += 500.0
+                // The food table the user prefers comes before the other one (0.22.0).
+                if (fromPreferred(food, prefer)) score += 200.0
                 if (nameWords.firstOrNull()?.startsWith(first) == true) score += 50.0
                 if (nameWords.any { it == first }) score += 20.0
                 score -= nameWords.size * 2.0
@@ -95,6 +100,49 @@ object FoodSearch {
             .map { it.first }
             .toList()
     }
+
+    /** "EU" for CIQUAL, "US" for USDA; null for no preference. */
+    fun fromPreferred(food: Food, prefer: String?): Boolean {
+        val id = food.builtInId ?: return false
+        return when (prefer) {
+            EU -> id.startsWith("C")
+            US -> id.startsWith("F") || id.startsWith("S") || id.startsWith("N")
+            else -> false
+        }
+    }
+
+    const val EU = "EU"
+    const val US = "US"
+    const val NO_PREFERENCE = "NONE"
+
+    /** Europe's countries, whose phones see the European table first unless the user chooses. */
+    private val EUROPE = setOf(
+        "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU",
+        "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "GB", "CH", "NO", "IS", "LI", "MC", "AD", "SM",
+    )
+
+    /** Which table comes first: the user's choice, or else by the phone's region. */
+    fun preferred(setting: String?, region: String): String? = when (setting) {
+        EU, US -> setting
+        NO_PREFERENCE -> null
+        else -> when {
+            region.uppercase() in EUROPE -> EU
+            region.uppercase() == "US" -> US
+            else -> null
+        }
+    }
+
+    /** Foods of [type] (0.22.0), with nothing typed: favourites, used before, preferred table, then by name. */
+    fun ofType(type: String, foods: List<Food>, usages: Map<String, Usage>, now: Long, favourites: Set<String>, prefer: String?, limit: Int = 100): List<Food> =
+        foods.asSequence().filter { it.category == type }
+            .sortedWith(
+                compareByDescending<Food> { it.key in favourites }
+                    .thenByDescending { usages[it.key]?.let { u -> usageScore(u, now) } ?: -1.0 }
+                    .thenByDescending { fromPreferred(it, prefer) }
+                    .thenBy { it.name.length }
+                    .thenBy { it.name.lowercase() },
+            )
+            .take(limit).toList()
 
     private val ACCENTS: Map<Char, Char> = buildMap {
         "àáâãäå".forEach { put(it, 'a') }
@@ -135,6 +183,7 @@ object BuiltInFoods {
                     micros = Micros.fromColumns(f, 11),
                 ),
                 portions = portions,
+                category = f.getOrNull(23)?.takeIf { it.isNotEmpty() },
             )
         }
         return out

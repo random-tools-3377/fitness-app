@@ -140,4 +140,23 @@ class BodyUnitsSearchTest {
         assertEquals(listOf(bread, rice), FoodSearch.visibleBuiltIns(listOf(bread, rice), replaced, listOf(mine.copy(hidden = true))))
         assertEquals(listOf(bread, rice), FoodSearch.visibleBuiltIns(listOf(bread, rice), replaced, emptyList()))
     }
+
+    @Test
+    fun foodsCanBeNarrowedToATypeAndATableComesFirst() {
+        val n = Nutrients(100.0, 1.0, 1.0, 1.0)
+        val usBread = Food(builtInId = "S1", name = "Bread, white", per100 = n, category = "bread")
+        val euBread = Food(builtInId = "C2", name = "Bread, white, French", per100 = n, category = "bread")
+        val cheese = Food(builtInId = "C3", name = "Cheese bread", per100 = n, category = "dairy")
+        val all = listOf(usBread, euBread, cheese)
+        assertEquals(listOf(euBread, usBread), FoodSearch.search("bread", all, emptyMap(), 0, type = "bread", prefer = FoodSearch.EU))
+        assertEquals(usBread, FoodSearch.search("bread", all, emptyMap(), 0, prefer = FoodSearch.US).first())
+        // A type with nothing typed lists that type.
+        assertEquals(listOf(euBread, usBread), FoodSearch.search("", all, emptyMap(), 0, type = "bread", prefer = FoodSearch.EU))
+        assertEquals(FoodSearch.EU, FoodSearch.preferred(null, "fr"))
+        assertEquals(FoodSearch.US, FoodSearch.preferred(null, "US"))
+        assertEquals(null, FoodSearch.preferred(FoodSearch.NO_PREFERENCE, "FR"))
+        assertEquals(FoodSearch.US, FoodSearch.preferred(FoodSearch.US, "FR"))
+        val parsed = BuiltInFoods.parse((listOf("S1", "Bread", "250", "9", "45", "3") + List(17) { "" } + "bread").joinToString("\t") + "\nS2\tOld\t1\t1\t1\t1\n")
+        assertEquals(listOf("bread", null), parsed.map { it.category })
+    }
 }

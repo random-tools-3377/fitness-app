@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.randomtools3377.fitness.BuildConfig
+import io.github.randomtools3377.fitness.core.macroGrams
 import io.github.randomtools3377.fitness.core.Activity
 import io.github.randomtools3377.fitness.core.Backup
 import io.github.randomtools3377.fitness.core.DistanceUnit
@@ -97,7 +98,8 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
             }
         }
 
-        MacroSection(settings.macros, settings.targetKcal ?: 2000, onSave = vm::setMacros)
+        MacroSection(settings.macros, settings.targetKcal ?: 2000, vm.latestKg(), settings.profile?.activity, onSave = vm::setMacros)
+        FoodTableSection(settings.preferredFoods) { v -> vm.updateSettingsNow { it.copy(preferredFoods = v) } }
         if (on(io.github.randomtools3377.fitness.core.Feature.MEAL_TARGETS)) MealSplitSection(vm, settings)
         if (on(io.github.randomtools3377.fitness.core.Feature.DAY_TARGETS)) DayTargetsSection(vm, settings)
         if (on(io.github.randomtools3377.fitness.core.Feature.EXTRAS) || on(io.github.randomtools3377.fitness.core.Feature.ALCOHOL_CAFFEINE)) ExtraTargetsSection(vm, settings)
@@ -227,34 +229,82 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier, open: (Route) -> Unit)
 }
 
 @Composable
-private fun MacroSection(current: MacroTargets, kcal: Int, onSave: (MacroTargets) -> Unit) {
+private fun MacroSection(current: MacroTargets, kcal: Int, weightKg: Double?, activity: Activity?, onSave: (MacroTargets) -> Unit) {
     var mode by remember(current) { mutableStateOf(current.mode) }
     var p by remember(current) { mutableStateOf(formatAmount(current.protein)) }
     var c by remember(current) { mutableStateOf(formatAmount(current.carbs)) }
     var f by remember(current) { mutableStateOf(formatAmount(current.fat)) }
-    fun typed() = MacroTargets(mode, Units.parse(p) ?: -1.0, Units.parse(c) ?: -1.0, Units.parse(f) ?: -1.0)
+    // By body weight (0.22.0): the user's own grams per kg, or empty for "by activity".
+    var perKg by remember(current) { mutableStateOf(current.proteinPerKg?.let { formatAmount(it) } ?: "") }
+    fun typed() = when (mode) {
+        MacroMode.BODY -> MacroTargets(MacroMode.BODY, fat = Units.parse(f) ?: -1.0, proteinPerKg = perKg.takeIf { it.isNotBlank() }?.let { Units.parse(it) ?: -1.0 })
+        else -> MacroTargets(mode, Units.parse(p) ?: -1.0, Units.parse(c) ?: -1.0, Units.parse(f) ?: -1.0)
+    }
     Section("Protein, carbs and fat") {
-        Choices(MacroMode.entries, mode, { if (it == MacroMode.PERCENT) "Percent of calories" else "Grams" }, { "macro-mode:${it.name}" }) { new ->
+        Choices(
+            listOf(MacroMode.BODY, MacroMode.PERCENT, MacroMode.GRAMS), mode,
+            { when (it) { MacroMode.BODY -> "By body weight"; MacroMode.PERCENT -> "Percent of calories"; MacroMode.GRAMS -> "Grams" } },
+            { "macro-mode:${it.name}" },
+        ) { new ->
             val t = typed()
             if (t.problem() == null) {
-                val switched = t.switchTo(new, kcal)
+                val switched = t.switchTo(new, kcal, weightKg, activity)
                 p = formatAmount(switched.protein); c = formatAmount(switched.carbs); f = formatAmount(switched.fat)
+                perKg = switched.proteinPerKg?.let { formatAmount(it) } ?: ""
             }
             mode = new
         }
-        val suffix = if (mode == MacroMode.PERCENT) "%" else "g"
-        NumberField(p, { p = it }, "Protein", "field:macro-protein", Modifier.fillMaxWidth(), suffix = suffix)
-        NumberField(c, { c = it }, "Carbs", "field:macro-carbs", Modifier.fillMaxWidth(), suffix = suffix)
-        NumberField(f, { f = it }, "Fat", "field:macro-fat", Modifier.fillMaxWidth(), suffix = suffix)
+        if (mode == MacroMode.BODY) {
+            val usual = io.github.randomtools3377.fitness.core.Protein.perKg(activity ?: Activity.SEDENTARY)
+            NumberField(perKg, { perKg = it }, "Protein per kg of body weight", "field:protein-per-kg", Modifier.fillMaxWidth(), suffix = "g/kg")
+            Text(
+                "Leave it empty to follow how active you are: ${formatAmount(usual)} g/kg for " +
+                    "\"${(activity ?: Activity.SEDENTARY).title.lowercase()}\". Mostly sitting 0.9, lightly active 1.4, " +
+                    "moderately active 1.6, active 1.8, very active 2.0.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            NumberField(f, { f = it }, "Fat, as a share of the calories", "field:macro-fat", Modifier.fillMaxWidth(), suffix = "%")
+            Text("Carbs are the rest of the calories.", style = MaterialTheme.typography.bodySmall)
+        } else {
+            val suffix = if (mode == MacroMode.PERCENT) "%" else "g"
+            NumberField(p, { p = it }, "Protein", "field:macro-protein", Modifier.fillMaxWidth(), suffix = suffix)
+            NumberField(c, { c = it }, "Carbs", "field:macro-carbs", Modifier.fillMaxWidth(), suffix = suffix)
+            NumberField(f, { f = it }, "Fat", "field:macro-fat", Modifier.fillMaxWidth(), suffix = suffix)
+        }
         val t = typed()
         val problem = t.problem()
         if (problem != null) {
             Text(problem, color = MaterialTheme.colorScheme.error)
-        } else if (mode == MacroMode.PERCENT) {
-            val g = t.grams(kcal)
-            Text("At $kcal kcal: ${macroLine(g)} a day.", style = MaterialTheme.typography.bodySmall)
+        } else if (mode != MacroMode.GRAMS) {
+            val g = t.grams(kcal, weightKg, activity)
+            val at = if (mode == MacroMode.BODY && weightKg != null) "At $kcal kcal and ${formatAmount(Math.round(weightKg * 10) / 10.0)} kg" else "At $kcal kcal"
+            Text("$at: ${macroLine(g)} a day.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("macro-preview"))
+            if (mode == MacroMode.BODY && weightKg == null) Text("Add a weigh-in or your body details to work protein out from your weight.", style = MaterialTheme.typography.bodySmall)
         }
         Button(onClick = { onSave(t) }, enabled = problem == null, modifier = Modifier.testTag("save-macros")) { Text("Save") }
+    }
+}
+
+/** Which built-in food table comes first in the search (0.22.0). */
+@Composable
+private fun FoodTableSection(current: String?, onSave: (String?) -> Unit) {
+    val region = java.util.Locale.getDefault().country
+    val options = listOf<String?>(null, io.github.randomtools3377.fitness.core.FoodSearch.EU, io.github.randomtools3377.fitness.core.FoodSearch.US, io.github.randomtools3377.fitness.core.FoodSearch.NO_PREFERENCE)
+    Section("Food search") {
+        Text("Which built-in foods come first when both have a match", style = MaterialTheme.typography.bodySmall)
+        Choices(options, current, { o ->
+            when (o) {
+                null -> "By my region" + when (io.github.randomtools3377.fitness.core.FoodSearch.preferred(null, region)) {
+                    io.github.randomtools3377.fitness.core.FoodSearch.EU -> " (European)"
+                    io.github.randomtools3377.fitness.core.FoodSearch.US -> " (US)"
+                    else -> ""
+                }
+                io.github.randomtools3377.fitness.core.FoodSearch.EU -> "European (CIQUAL)"
+                io.github.randomtools3377.fitness.core.FoodSearch.US -> "US (USDA)"
+                else -> "Neither"
+            }
+        }, { "food-table:${it ?: "region"}" }) { onSave(it) }
+        Text("Your own foods, favourites and foods you've used still come first.", style = MaterialTheme.typography.bodySmall)
     }
 }
 
