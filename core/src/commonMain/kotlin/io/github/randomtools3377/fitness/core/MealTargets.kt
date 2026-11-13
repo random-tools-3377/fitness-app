@@ -17,7 +17,7 @@ data class MealSplit(
     /** Each meal's target: calories, and protein, carbs and fat following the same split. */
     fun targets(day: Nutrients): Map<Meal, Nutrients> {
         val fractions: Map<Meal, Double> = when (mode) {
-            MacroMode.PERCENT -> Meal.entries.associateWith { (shares[it] ?: 0.0) / 100.0 }
+            MacroMode.PERCENT, MacroMode.BODY -> Meal.entries.associateWith { (shares[it] ?: 0.0) / 100.0 }
             MacroMode.GRAMS -> Meal.entries.associateWith { if (day.kcal > 0) (shares[it] ?: 0.0) / day.kcal else 0.0 }
         }
         return fractions.mapValues { (_, f) -> day * f }

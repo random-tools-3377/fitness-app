@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.randomtools3377.fitness.FitnessApplication
+import io.github.randomtools3377.fitness.core.macroGrams
 import io.github.randomtools3377.fitness.core.AllStreaks
 import io.github.randomtools3377.fitness.core.AppSettings
 import io.github.randomtools3377.fitness.core.DiaryEntry
@@ -275,7 +276,7 @@ private fun WeekInWordsCard(
                 targetKcal = target?.let { Units.kcalToShown(it.toDouble(), units.energy).roundToInt() },
                 daysOnTarget = p.daysOnTarget.takeIf { target != null },
                 avgProtein = p.average.protein.takeIf { p.daysLogged > 0 }?.roundToInt(),
-                targetProtein = target?.let { settings.macros.grams(it).protein.roundToInt() },
+                targetProtein = target?.let { settings.macroGrams(it, io.github.randomtools3377.fitness.core.Weight.latest(weighIns)?.kg).protein.roundToInt() },
                 workouts = p.workouts.takeIf { workoutsOn },
                 workoutGoal = settings.workoutsPerWeek.takeIf { workoutsOn },
                 waterDays = waterDays.takeIf { waterOn },

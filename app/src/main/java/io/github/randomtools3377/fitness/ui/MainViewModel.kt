@@ -248,8 +248,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val recipeFoods: StateFlow<List<Food>> = repo.recipes.map { list -> list.map { it.toFood() } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val results: StateFlow<List<Food>> = combine(query.debounce(120), combine(foods, recipeFoods) { a, b -> b + a }, visibleBuiltIns, usageAndFavourites, usedProducts) { q, mine, built, (used, favs), products ->
-        FoodSearch.search(q, mine + products + built, used, now(), favourites = favs)
+    /** The food type the search is narrowed to, or null for all (0.22.0). */
+    val foodType = MutableStateFlow<String?>(null)
+
+    /** Which built-in table comes first: the user's choice, or the phone's region (0.22.0). */
+    private val preferredTable: StateFlow<String?> = settings.map { FoodSearch.preferred(it.preferredFoods, java.util.Locale.getDefault().country) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Whether the built-in foods have types to narrow the search by. */
+    val hasFoodTypes: StateFlow<Boolean> = builtIns.map { list -> list.any { it.category != null } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val searchFor = combine(query.debounce(120), foodType, preferredTable) { q, t, p -> Triple(q, t, p) }
+
+    val results: StateFlow<List<Food>> = combine(searchFor, combine(foods, recipeFoods) { a, b -> b + a }, visibleBuiltIns, usageAndFavourites, usedProducts) { (q, type, prefer), mine, built, (used, favs), products ->
+        FoodSearch.search(q, mine + products + built, used, now(), favourites = favs, type = type, prefer = prefer)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Foods used before, the most recent and most used first. */
@@ -264,6 +277,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (s.features == null) {
                 val first = io.github.randomtools3377.fitness.core.Features.firstChoice(s, repo.featureUse())
                 repo.updateSettings { it.copy(features = io.github.randomtools3377.fitness.core.Features.encode(first)) }
+            }
+            // 0.22.0: protein follows body weight and activity, unless the user had set their own.
+            if (!s.macrosChecked) {
+                repo.updateSettings {
+                    it.copy(macrosChecked = true, macros = if (it.macros == MacroTargets.OLD_DEFAULT) MacroTargets() else it.macros)
+                }
             }
         }
         // Steps follow the day shown; the home-screen widget follows the day's food and water (0.10.0).

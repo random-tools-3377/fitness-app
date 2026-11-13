@@ -27,7 +27,10 @@ Each line of foods.tsv is:
 
 The last four, added for 0.7.0, are empty when the table doesn't give them. After them come
 alcohol (g), caffeine (mg), iron, calcium, vitamin D, vitamin C, potassium, magnesium, vitamin
-B12, folate, zinc and vitamin A (0.11.0; see MICROS for the units), also empty when not given. Salt is worked out
+B12, folate, zinc and vitamin A (0.11.0; see MICROS for the units), also empty when not given.
+Last comes the food's type (0.22.0), one of CATEGORIES, worked out from the table's own food
+group (USDA's food category or survey category, CIQUAL's group and subgroup) and, where that
+says little, from the name; "other" when neither tells. Salt is worked out
 from USDA's sodium (mg × 2.5 ÷ 1000), the way EU labels count it; CIQUAL gives salt itself.
 
 Nutrients are per 100 g. The id is the source letter and the food's id in that table: F, S or N
@@ -110,6 +113,53 @@ MICROS = [
 ]
 
 MAX_PORTIONS = 8
+
+# The food types the app's search can filter by (0.22.0), and the words in a table's own food
+# group (or, failing that, the food's name) that put a food in each. Checked in this order, so
+# "Meat mixed dishes" is a dish and "Fruit juice" a drink.
+CATEGORIES = [
+    ("baby", r"baby|infant"),
+    ("dishes", r"mixed dish|dishes|entree|entrée|meals|fast food|restaurant|sandwich|burger|pizza|taco|burrito|nachos|soup|stew|lasagn|quiche|salads? \(mixed|mixed salad|starters|savoury pastr|savory pastr|crepe|pies? and|fried rice|lo mein|chow mein|stir.?fry|casserole|frozen meal"),
+    ("drinks", r"juice|beverage|drink|coffee|\btea\b|soda|soft drink|\bwaters?\b|beer|wine|liquor|spirits|alcohol|smoothie|shake|milk substitute|plant.based milk|nectar|lemonade"),
+    ("sweets", r"sweet|candy|confection|chocolate|cake|cookie|biscuit.*sweet|brownie|pie\b|pastr|doughnut|donut|pudding|dessert|ice cream|sorbet|sugar|syrup|honey|jam|jelly|marmalade|muffin|croissant|viennoiser|cocoa"),
+    ("snacks", r"snack|chips|crisps|popcorn|pretzel"),
+    ("sauces", r"condiment|ketchup|mustard|mayonnaise|dressing|gravy|\bsauces?\b|salsa"),
+    ("eggs", r"\beggs?\b"),
+    ("fats", r"\bfats?\b|\boils?\b|butter|margarine|lard|shortening"),
+    ("dairy", r"milk|dairy|cheese|yogurt|yoghurt|cream|kefir|curd|fromage"),
+    ("fish", r"fish|shellfish|seafood|mollusc|crustacean|salmon|tuna|shrimp|prawn"),
+    ("meat", r"meat|beef|pork|lamb|veal|game|poultry|chicken|turkey|duck|sausage|frankfurter|bacon|\bham\b|cold cuts|luncheon|liver|offal|delicatessen|charcuterie"),
+    ("legumes", r"legume|bean|lentil|chickpea|pulse|tofu|soy"),
+    ("nuts", r"\bnuts?\b|seed|almond|peanut|walnut|hazelnut|cashew"),
+    ("breakfast", r"breakfast cereal|ready.to.eat cereal|oatmeal|cooked cereal|porridge|muesli|granola"),
+    ("grains", r"grain|cereal|\brice\b|pasta|noodle|flour|wheat|\boats?\b|barley|\bcorn\b|quinoa|couscous|semolina|\bbran\b|cornmeal"),
+    ("bread", r"bread|baked|bakery|roll|bagel|tortilla|cracker|bun\b|pita|rusk|toast"),
+    ("fruit", r"fruit|apple|banana|berr|orange|grape|melon|pear|peach|plum|cherr|citrus"),
+    ("veg", r"vegetable|potato|tuber|tomato|lettuce|onion|carrot|cabbage|greens|salad|mushroom|pepper|squash|spinach|broccoli|cauliflower|celery|kale|cucumber|zucchini|courgette|leek|garlic|beet|asparagus|seaweed|wakame|dulse|alga|basil|cilantro|parsley"),
+    ("sauces", r"sauce|gravy|dressing|condiment|spice|herb|seasoning|salt|ketchup|mustard|mayonnaise|vinegar|salsa|stock|broth"),
+]
+CATEGORY_KEYS = [k for k, _ in CATEGORIES] + ["other"]
+
+
+def category(groups, name):
+    """The food's type: from its table's food groups (most specific first), or else its name."""
+    for text in [g for g in groups if g] + [name or ""]:
+        lowered = text.lower()
+        if not lowered:
+            continue
+        for key, pattern in CATEGORIES:
+            if re.search(pattern, lowered):
+                return key
+    return "other"
+
+
+# How each table's own groups came out, printed at the end so a wrong one is easy to spot.
+GROUPS_SEEN = {}
+
+
+def note_group(group, key):
+    GROUPS_SEEN.setdefault((group or "(none)", key), 0)
+    GROUPS_SEEN[(group or "(none)", key)] += 1
 
 # ---------------------------------------------------------------------------------------------
 # CIQUAL
@@ -319,6 +369,20 @@ def usda_row(food, letter):
     name = clean(food.get("description", ""))
     if not name:
         return None
+    group = (food.get("foodCategory") or {}).get("description") or (food.get("wweiaFoodCategory") or {}).get("wweiaFoodCategoryDescription") or ""
+    # USDA puts eggs with dairy, and butter too; the name tells them apart.
+    lowered = name.lower()
+    if group == "Dairy and Egg Products":
+        group = "Eggs" if lowered.startswith("egg") else "Butter" if lowered.startswith("butter") else "Dairy"
+    if group == "Fruits and Fruit Juices":
+        group = "Fruit juice" if "juice" in lowered or "nectar" in lowered else "Fruits"
+    if group == "Soups, Sauces, and Gravies" and not re.search(r"soup|chowder|stew", lowered):
+        group = "Sauces and gravies"
+    if group == "Baked Products":
+        sweet = re.search(r"cake|cookie|pie\b|pastr|doughnut|brownie|muffin|danish|croissant|sweet", lowered)
+        group = "Cakes and sweet baking" if sweet else "Bread and baked"
+    key = category([group], name)
+    note_group("USDA: " + group, key)
     return [
         letter + str(food["fdcId"]),
         name,
@@ -331,7 +395,7 @@ def usda_row(food, letter):
         optional(first(amounts, SUGARS)),
         optional(first(amounts, SAT_FAT)),
         optional(salt_from_sodium(first(amounts, SODIUM_MG)), 2),
-    ] + micro_columns(lambda name: first(amounts, next(m[1] for m in MICROS if m[0] == name)))
+    ] + micro_columns(lambda name: first(amounts, next(m[1] for m in MICROS if m[0] == name))) + [key]
 
 
 def build_usda(args, work):
@@ -518,8 +582,11 @@ def build_ciqual(args, work):
         def member(prefix):
             return next(n for n in members if os.path.basename(n).lower().startswith(prefix) and n.lower().endswith(".xml"))
 
-        alim = parse_xml(z.read(member("alim_")))
+        foods_file = next(n for n in members if os.path.basename(n).lower().startswith("alim_") and not os.path.basename(n).lower().startswith("alim_grp") and n.lower().endswith(".xml"))
+        alim = parse_xml(z.read(foods_file))
         alim = [a for a in alim if "alim_code" in a]
+        grp_file = next((n for n in members if os.path.basename(n).lower().startswith("alim_grp") and n.lower().endswith(".xml")), None)
+        groups = parse_xml(z.read(grp_file)) if grp_file else []
         compo = parse_xml(z.read(member("compo_")))
         const = parse_xml(z.read(member("const_")))
 
@@ -552,6 +619,19 @@ def build_ciqual(args, work):
         if code in wanted:
             values.setdefault(c.get("alim_code"), {})[code] = ciqual_value(c.get("teneur"))
 
+    # Each food's group, subgroup and sub-subgroup names, most specific first.
+    group_names = {}
+    for g in groups:
+        for level in ("alim_ssssgrp", "alim_ssgrp", "alim_grp"):
+            code = (g.get(level + "_code") or "").strip()
+            label = clean(g.get(level + "_nom_eng") or "")
+            if code and label and code != "000000":
+                group_names[(level, code)] = label
+
+    def ciqual_groups(a):
+        parts = [group_names.get((level, (a.get(level + "_code") or "").strip())) for level in ("alim_ssssgrp", "alim_ssgrp", "alim_grp")]
+        return [p for p in parts if p]
+
     rows = []
     for a in alim:
         v = values.get(a["alim_code"], {})
@@ -574,6 +654,10 @@ def build_ciqual(args, work):
             optional(v.get(sat_fat[0])),
             optional(v.get(salt[0]), 2),
         ] + micro_columns(lambda name: ciqual_vit_a(v, retinol, beta_carotene) if name == "vitA" else (v.get(micro_codes[name]) if micro_codes[name] else None)))
+        parts = ciqual_groups(a)
+        key = category(parts, name)
+        note_group("CIQUAL: " + " / ".join(parts), key)
+        rows[-1].append(key)
     name = re.sub(r"^ciqual-(\d+-)?", "", os.path.basename(path))
     print("%s (%s): %d foods, %d kept" % (CIQUAL_TITLE, name, len(alim), len(rows)))
     return rows, [(CIQUAL_TITLE, name, len(rows))]
@@ -636,10 +720,18 @@ def main():
             f.write("# %s: %s, %d foods\n" % (title, name, kept))
         f.write("# id\tname\tkcal\tprotein\tcarbs\tfat\tportions\tfibre\tsugar\tsaturates\tsalt\t"
                 + "\t".join(m[0] for m in MICROS)
+                + "\tcategory"
                 + "   (per 100 g; carbs without fibre; portions label=grams; an empty extra is not known)\n")
         for row in rows:
             f.write("\t".join(row) + "\n")
     print(len(rows), "foods written to", target)
+    print("Food types, from each table's own groups:")
+    for (group, key), n in sorted(GROUPS_SEEN.items()):
+        print("  %-10s %5d  %s" % (key, n, group))
+    counts = {}
+    for row in rows:
+        counts[row[-1]] = counts.get(row[-1], 0) + 1
+    print("Foods of each type:", ", ".join("%s %d" % (k, counts.get(k, 0)) for k in CATEGORY_KEYS))
 
     files = "\n".join("  - %s: %s (%d foods)" % u for u in used)
     with open(os.path.join(args.out, "foods-NOTICE.txt"), "w", encoding="utf-8", newline="\n") as f:

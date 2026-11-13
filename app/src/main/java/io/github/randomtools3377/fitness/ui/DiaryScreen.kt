@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.randomtools3377.fitness.core.macroGrams
 import io.github.randomtools3377.fitness.core.DiaryEntry
 import io.github.randomtools3377.fitness.core.Food
 import io.github.randomtools3377.fitness.core.Meal
@@ -128,7 +129,7 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
 
         item {
             SummaryCard(
-                totals.total, burned, settings.burnedHalf, target, settings.macros.grams(target ?: 0), settings.extraTargets, units, open, steps, stepsKcal,
+                totals.total, burned, settings.burnedHalf, target, settings.macroGrams(target ?: 0, vm.latestKg()), settings.extraTargets, units, open, steps, stepsKcal,
                 why = why, drinkGrams = settings.drinkGrams ?: io.github.randomtools3377.fitness.core.standardDrinkGrams(java.util.Locale.getDefault().country),
             )
         }
@@ -177,7 +178,7 @@ fun DiaryScreen(vm: MainViewModel, bvm: BodyViewModel, modifier: Modifier, open:
         for (meal in Meal.entries) {
             item(key = meal.name) {
                 val mealTargets = if (settings.mealSplit.enabled && target != null)
-                    settings.mealSplit.targets(settings.macros.grams(target)) else null
+                    settings.mealSplit.targets(settings.macroGrams(target, vm.latestKg())) else null
                 MealCard(
                     meal = meal,
                     target = mealTargets?.get(meal),

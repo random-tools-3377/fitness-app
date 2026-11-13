@@ -79,6 +79,8 @@ fun AddFoodScreen(
         AddMode.RECIPE -> vm.addToRecipe(f, a)
     }
     val query by vm.query.collectAsState()
+    val foodType by vm.foodType.collectAsState()
+    val hasTypes by vm.hasFoodTypes.collectAsState()
     val results by vm.results.collectAsState()
     val recent by vm.recent.collectAsState()
     val mine by vm.foods.collectAsState()
@@ -99,7 +101,7 @@ fun AddFoodScreen(
         }
     }
 
-    DisposableEffect(Unit) { onDispose { vm.query.value = "" } }
+    DisposableEffect(Unit) { onDispose { vm.query.value = ""; vm.foodType.value = null } }
 
     // A food just typed in opens its amount straight away.
     LaunchedEffect(openFoodKey, mine) {
@@ -132,6 +134,26 @@ fun AddFoodScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("search"),
         )
+        // Narrowing the built-in foods to one type (0.22.0).
+        if (hasTypes) {
+            androidx.compose.foundation.lazy.LazyRow(
+                Modifier.fillMaxWidth().padding(top = 6.dp).testTag("food-types"),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                item {
+                    androidx.compose.material3.FilterChip(selected = foodType == null, onClick = { vm.foodType.value = null }, label = { Text("All") }, modifier = Modifier.testTag("type:all"))
+                }
+                items(io.github.randomtools3377.fitness.core.FoodTypes.ALL, key = { it.first }) { (key, title) ->
+                    androidx.compose.material3.FilterChip(
+                        selected = foodType == key,
+                        onClick = { vm.foodType.value = if (foodType == key) null else key },
+                        label = { Text(title) },
+                        modifier = Modifier.testTag("type:$key"),
+                    )
+                }
+            }
+        }
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (on(io.github.randomtools3377.fitness.core.Feature.BARCODES)) OutlinedButton(onClick = scan, modifier = Modifier.testTag("scan")) { Text("Scan") }
             OutlinedButton(onClick = { newFood(null) }, modifier = Modifier.testTag("new-food")) { Text("From a label") }
@@ -149,7 +171,7 @@ fun AddFoodScreen(
             }
         }
         LazyColumn(Modifier.fillMaxSize().testTag("food-list")) {
-            if (query.isBlank()) {
+            if (query.isBlank() && foodType == null) {
                 if (saved.isNotEmpty() && mode != AddMode.RECIPE) {
                     item { Heading("Saved meals") }
                     items(saved, key = { "meal:${it.id}" }) { m ->
@@ -177,10 +199,19 @@ fun AddFoodScreen(
                     )
                 }
             } else {
+                if (foodType != null) {
+                    item {
+                        Text(
+                            "Built-in foods: ${io.github.randomtools3377.fitness.core.FoodTypes.title(foodType!!).lowercase()}" + (if (query.isBlank()) ". Type to narrow it down." else ""),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                }
                 if (results.isEmpty()) {
                     item {
                         Text(
-                            "No food matches. Try fewer words, or type it in from the label.",
+                            if (foodType != null) "No built-in food of this type matches. Try \"All\"." else "No food matches. Try fewer words, or type it in from the label.",
                             modifier = Modifier.padding(16.dp),
                         )
                     }

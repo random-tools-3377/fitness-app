@@ -82,8 +82,8 @@ class TargetsTest {
     }
 
     @Test
-    fun macroTargetsStartAt25_50_25PercentOfTheCalories() {
-        val g = MacroTargets().grams(2000)
+    fun macroTargetsCanBe25_50_25PercentOfTheCalories() {
+        val g = MacroTargets.OLD_DEFAULT.grams(2000)
         assertEquals(125.0, g.protein, 1e-9) // 500 kcal / 4
         assertEquals(250.0, g.carbs, 1e-9) // 1000 kcal / 4
         assertEquals(55.56, g.fat, 0.01) // 500 kcal / 9
@@ -91,8 +91,29 @@ class TargetsTest {
     }
 
     @Test
+    fun proteinStartsFromBodyWeightAndActivity() {
+        // 70 kg, mostly sitting: 0.9 g a kg = 63 g; fat 25% of 2,000 kcal; carbs the rest.
+        val sitting = MacroTargets().grams(2000, 70.0, Activity.SEDENTARY)
+        assertEquals(63.0, sitting.protein, 1e-9)
+        assertEquals(55.56, sitting.fat, 0.01)
+        assertEquals((2000 - 63 * 4 - 500) / 4.0, sitting.carbs, 1e-9)
+        assertEquals(98.0, MacroTargets().grams(2000, 70.0, Activity.LIGHT).protein, 1e-9) // 1.4 g a kg
+        assertEquals(140.0, MacroTargets().grams(2000, 70.0, Activity.VERY_ACTIVE).protein, 1e-9) // 2.0 g a kg
+        // The user's own number per kg wins.
+        assertEquals(84.0, MacroTargets(proteinPerKg = 1.2).grams(2000, 70.0, Activity.VERY_ACTIVE).protein, 1e-9)
+        // Without a weight, a quarter of the calories.
+        assertEquals(125.0, MacroTargets().grams(2000).protein, 1e-9)
+        assertNotNull(MacroTargets(proteinPerKg = 5.0).problem())
+        // Switching to percentages keeps the same grams, near enough.
+        val pc = MacroTargets().switchTo(MacroMode.PERCENT, 2000, 70.0, Activity.SEDENTARY)
+        assertEquals(13.0, pc.protein)
+        assertEquals(25.0, pc.fat)
+        assertEquals(62.0, pc.carbs)
+    }
+
+    @Test
     fun macroTargetsCanBeGramsAndSwitchBothWays() {
-        val grams = MacroTargets().switchTo(MacroMode.GRAMS, 2000)
+        val grams = MacroTargets.OLD_DEFAULT.switchTo(MacroMode.GRAMS, 2000)
         assertEquals(MacroTargets(MacroMode.GRAMS, 125.0, 250.0, 56.0), grams)
         assertEquals(125.0, grams.grams(3000).protein, 1e-9) // grams don't follow the calories
         val back = grams.switchTo(MacroMode.PERCENT, 2000)

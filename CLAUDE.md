@@ -86,6 +86,17 @@ workouts or exports.
   - A meal, or a whole day, can be copied from another day.
 - Each food and each day shows calories and also protein, carbs and fat.
 
+Decided on 2026-11-13 (0.22.0):
+
+- The food search can be narrowed to a type of food (meat, dairy, bread, beans and lentils,
+  meals and dishes, and so on), from the food tables' own groups.
+- The user can choose which built-in table comes first in the search, European or US.
+- **Details (default):** the types are worked out by tools/build-food-list.py from USDA's food
+  categories and survey categories and CIQUAL's groups; only built-in foods have one. The tables
+  don't say how processed a food is, so there is no "processed" or "staple" type. Which table
+  comes first follows the phone's region (European in Europe, US in the US) until the user
+  chooses; the user's own foods, favourites and foods used before still come first.
+
 ## Targets
 
 - The daily calorie target is worked out from age, height, weight, sex and how active the user
@@ -95,8 +106,13 @@ workouts or exports.
   550 kcal a day per 0.5 kg. The app never suggests a target below 1,200 kcal (women) or
   1,500 kcal (men), and says why. When a new weigh-in changes the worked-out target by 50 kcal or
   more, the app offers the new number rather than changing it by itself.
-- Protein, carbs and fat get targets too **(default: 25% / 50% / 25% of the calories, which the
-  user can change, in percentages or grams)**.
+- Protein, carbs and fat get targets too, which the user can change, by body weight, in
+  percentages or in grams.
+- Protein follows body weight and how active the user is (decided on 2026-11-13, 0.22.0): about
+  0.8 to 1.0 g per kg when mostly sitting, 1.2 to 1.6 g when lightly active. **(default: 0.9,
+  1.4, 1.6, 1.8 and 2.0 g per kg from "mostly sitting" to "very active", at the latest weight;
+  fat 25% of the calories; carbs the rest. On updating, targets still at the old 25% / 50% / 25%
+  move to this; ones the user changed stay.)**
 - Water has a daily target **(default: 2 litres, with buttons for a glass of 250 ml and a bottle
   of 500 ml, sizes the user can change)**.
 

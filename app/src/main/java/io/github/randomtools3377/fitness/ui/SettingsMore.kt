@@ -244,7 +244,7 @@ fun MealSplitSection(vm: MainViewModel, settings: AppSettings) {
         if (on) {
             if (day == null) Text("Set a daily calorie target first.", style = MaterialTheme.typography.bodySmall)
             Choices(
-                io.github.randomtools3377.fitness.core.MacroMode.entries, mode,
+                listOf(io.github.randomtools3377.fitness.core.MacroMode.PERCENT, io.github.randomtools3377.fitness.core.MacroMode.GRAMS), mode,
                 { if (it == io.github.randomtools3377.fitness.core.MacroMode.PERCENT) "Percent" else "Calories" }, { "split-mode:${it.name}" },
             ) { new ->
                 // Keep the same split when switching between percent and calories.

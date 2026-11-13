@@ -130,24 +130,57 @@ object Targets {
     private fun roundTo10(x: Double): Int = (x / 10.0).roundToInt() * 10
 }
 
-/** How the protein, carbs and fat targets are set: as shares of the calories, or in grams. */
+/**
+ * How the protein, carbs and fat targets are set: as shares of the calories, in grams, or (0.22.0)
+ * protein from body weight and activity, fat as a share of the calories, and carbs the rest.
+ */
 @Serializable
-enum class MacroMode { PERCENT, GRAMS }
+enum class MacroMode { PERCENT, GRAMS, BODY }
+
+/** Protein by body weight (0.22.0): grams a day for each kg, by how active the user is. */
+object Protein {
+    /**
+     * Mostly sitting 0.9 g/kg (the usual 0.8 to 1.0), lightly active 1.4 (1.2 to 1.6), moderately
+     * active 1.6, active 1.8, very active 2.0.
+     */
+    fun perKg(activity: Activity): Double = when (activity) {
+        Activity.SEDENTARY -> 0.9
+        Activity.LIGHT -> 1.4
+        Activity.MODERATE -> 1.6
+        Activity.ACTIVE -> 1.8
+        Activity.VERY_ACTIVE -> 2.0
+    }
+}
 
 /**
  * Protein, carbs and fat targets. In [MacroMode.PERCENT] the three numbers are percentages of
- * the calorie target; in [MacroMode.GRAMS] they are grams a day.
+ * the calorie target; in [MacroMode.GRAMS] they are grams a day. In [MacroMode.BODY] (the
+ * default from 0.22.0) protein is [proteinPerKg] grams for each kg of body weight, or by
+ * activity when that is null, [fat] is a percentage of the calories, and carbs are the rest.
  */
 @Serializable
 data class MacroTargets(
-    val mode: MacroMode = MacroMode.PERCENT,
+    val mode: MacroMode = MacroMode.BODY,
     val protein: Double = 25.0,
     val carbs: Double = 50.0,
     val fat: Double = 25.0,
+    val proteinPerKg: Double? = null,
 ) {
-    /** Grams a day for a calorie target. Protein and carbs have 4 kcal a gram, fat 9. */
-    fun grams(kcalTarget: Int): Nutrients = when (mode) {
+    /** The protein per kg used: the user's own, or else by [activity]. */
+    fun perKg(activity: Activity?): Double = proteinPerKg ?: Protein.perKg(activity ?: Activity.SEDENTARY)
+
+    /**
+     * Grams a day for a calorie target. Protein and carbs have 4 kcal a gram, fat 9. By body
+     * weight it needs [weightKg]; without one it uses 25% of the calories for protein.
+     */
+    fun grams(kcalTarget: Int, weightKg: Double? = null, activity: Activity? = null): Nutrients = when (mode) {
         MacroMode.GRAMS -> Nutrients(kcalTarget.toDouble(), protein, carbs, fat)
+        MacroMode.BODY -> {
+            val k = kcalTarget.toDouble()
+            val p = weightKg?.let { it * perKg(activity) } ?: (k * 0.25 / KCAL_PROTEIN)
+            val f = k * fat / 100.0 / KCAL_FAT
+            Nutrients(k, protein = p, carbs = ((k - p * KCAL_PROTEIN - f * KCAL_FAT) / KCAL_CARBS).coerceAtLeast(0.0), fat = f)
+        }
         MacroMode.PERCENT -> Nutrients(
             kcal = kcalTarget.toDouble(),
             protein = kcalTarget * protein / 100.0 / KCAL_PROTEIN,
@@ -157,27 +190,28 @@ data class MacroTargets(
     }
 
     /** The same targets in the other mode, for the same calories, so switching keeps the numbers. */
-    fun switchTo(newMode: MacroMode, kcalTarget: Int): MacroTargets {
+    fun switchTo(newMode: MacroMode, kcalTarget: Int, weightKg: Double? = null, activity: Activity? = null): MacroTargets {
         if (newMode == mode) return this
         return when (newMode) {
-            MacroMode.GRAMS -> grams(kcalTarget).let {
+            MacroMode.BODY -> MacroTargets(MacroMode.BODY, fat = 25.0)
+            MacroMode.GRAMS -> grams(kcalTarget, weightKg, activity).let {
                 MacroTargets(MacroMode.GRAMS, it.protein.roundToInt().toDouble(), it.carbs.roundToInt().toDouble(), it.fat.roundToInt().toDouble())
             }
             MacroMode.PERCENT -> {
                 val k = kcalTarget.toDouble().coerceAtLeast(1.0)
-                MacroTargets(
-                    MacroMode.PERCENT,
-                    (protein * KCAL_PROTEIN * 100 / k).roundToInt().toDouble(),
-                    (carbs * KCAL_CARBS * 100 / k).roundToInt().toDouble(),
-                    (fat * KCAL_FAT * 100 / k).roundToInt().toDouble(),
-                )
+                val g = grams(kcalTarget, weightKg, activity)
+                val p = (g.protein * KCAL_PROTEIN * 100 / k).roundToInt().toDouble()
+                val f = (g.fat * KCAL_FAT * 100 / k).roundToInt().toDouble()
+                MacroTargets(MacroMode.PERCENT, p, (100.0 - p - f).coerceAtLeast(0.0), f)
             }
         }
     }
 
     /** In percent mode the three must add up to 100. */
     fun problem(): String? = when {
-        protein < 0 || carbs < 0 || fat < 0 -> "Numbers can't be below zero."
+        protein < 0 || carbs < 0 || fat < 0 || (proteinPerKg ?: 0.0) < 0 -> "Numbers can't be below zero."
+        mode == MacroMode.BODY && fat > 60 -> "Fat at more than 60% of the calories leaves too little for the rest."
+        mode == MacroMode.BODY && (proteinPerKg ?: 0.0) > 3.5 -> "More than 3.5 g of protein per kg is more than anyone needs."
         mode == MacroMode.PERCENT && abs(protein + carbs + fat - 100.0) > 0.5 ->
             "The three percentages add up to ${formatAmount(protein + carbs + fat)}%. They need to add up to 100%."
         else -> null
@@ -187,6 +221,9 @@ data class MacroTargets(
         const val KCAL_PROTEIN = 4.0
         const val KCAL_CARBS = 4.0
         const val KCAL_FAT = 9.0
+
+        /** The default before 0.22.0, which turns into protein by body weight on updating. */
+        val OLD_DEFAULT = MacroTargets(MacroMode.PERCENT, 25.0, 50.0, 25.0)
     }
 }
 

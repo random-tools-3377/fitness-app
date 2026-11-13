@@ -40,6 +40,10 @@ data class AppSettings(
     val exerciseTracks: Map<String, List<Track>> = emptyMap(),
     /** Keep the screen on while a workout is open (0.20.0). */
     val keepScreenOn: Boolean = false,
+    /** Which built-in food table comes first in the search (0.22.0): "EU", "US", "NONE", or null for the phone's region. */
+    val preferredFoods: String? = null,
+    /** Whether the protein, carbs and fat targets were looked at for 0.22.0's protein by body weight. */
+    val macrosChecked: Boolean = false,
     /** Daily targets for fibre, sugar, saturated fat and salt; off until set (0.7.0). */
     val extraTargets: ExtraTargets = ExtraTargets(),
     /** The weekly programme: a saved workout's id for each day it's on, 1 = Monday (0.9.0). */
@@ -155,3 +159,6 @@ data class Backup(
 }
 
 class BackupError(message: String) : Exception(message)
+
+/** The day's protein, carbs and fat in grams for [kcal], at the latest weight ([latestKg]) and the profile's activity. */
+fun AppSettings.macroGrams(kcal: Int, latestKg: Double?): Nutrients = macros.grams(kcal, latestKg ?: profile?.weightKg, profile?.activity)
