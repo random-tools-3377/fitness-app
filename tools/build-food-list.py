@@ -121,8 +121,9 @@ CATEGORIES = [
     ("baby", r"baby|infant"),
     ("dishes", r"mixed dish|dishes|entree|entrée|meals|fast food|restaurant|sandwich|burger|pizza|taco|burrito|nachos|soup|stew|lasagn|quiche|salads? \(mixed|mixed salad|starters|savoury pastr|savory pastr|crepe|pies? and|fried rice|lo mein|chow mein|stir.?fry|casserole|frozen meal"),
     ("drinks", r"juice|beverage|drink|coffee|\btea\b|soda|soft drink|\bwaters?\b|beer|wine|liquor|spirits|alcohol|smoothie|shake|milk substitute|plant.based milk|nectar|lemonade"),
-    ("sweets", r"sweet|candy|confection|chocolate|cake|cookie|biscuit.*sweet|brownie|pie\b|pastr|doughnut|donut|pudding|dessert|ice cream|sorbet|sugar|syrup|honey|jam|jelly|marmalade|muffin|croissant|viennoiser"),
+    ("sweets", r"sweet|candy|confection|chocolate|cake|cookie|biscuit.*sweet|brownie|pie\b|pastr|doughnut|donut|pudding|dessert|ice cream|sorbet|sugar|syrup|honey|jam|jelly|marmalade|muffin|croissant|viennoiser|cocoa"),
     ("snacks", r"snack|chips|crisps|popcorn|pretzel"),
+    ("sauces", r"condiment|ketchup|mustard|mayonnaise|dressing|gravy|\bsauces?\b|salsa"),
     ("eggs", r"\beggs?\b"),
     ("fats", r"\bfats?\b|\boils?\b|butter|margarine|lard|shortening"),
     ("dairy", r"milk|dairy|cheese|yogurt|yoghurt|cream|kefir|curd|fromage"),
@@ -131,10 +132,10 @@ CATEGORIES = [
     ("legumes", r"legume|bean|lentil|chickpea|pulse|tofu|soy"),
     ("nuts", r"\bnuts?\b|seed|almond|peanut|walnut|hazelnut|cashew"),
     ("breakfast", r"breakfast cereal|ready.to.eat cereal|oatmeal|cooked cereal|porridge|muesli|granola"),
-    ("grains", r"grain|cereal|\brice\b|pasta|noodle|flour|wheat|\boats?\b|barley|\bcorn\b|quinoa|couscous|semolina"),
+    ("grains", r"grain|cereal|\brice\b|pasta|noodle|flour|wheat|\boats?\b|barley|\bcorn\b|quinoa|couscous|semolina|\bbran\b|cornmeal"),
     ("bread", r"bread|baked|bakery|roll|bagel|tortilla|cracker|bun\b|pita|rusk|toast"),
     ("fruit", r"fruit|apple|banana|berr|orange|grape|melon|pear|peach|plum|cherr|citrus"),
-    ("veg", r"vegetable|potato|tuber|tomato|lettuce|onion|carrot|cabbage|greens|salad|mushroom|pepper|squash|spinach|broccoli"),
+    ("veg", r"vegetable|potato|tuber|tomato|lettuce|onion|carrot|cabbage|greens|salad|mushroom|pepper|squash|spinach|broccoli|cauliflower|celery|kale|cucumber|zucchini|courgette|leek|garlic|beet|asparagus|seaweed|wakame|dulse|alga|basil|cilantro|parsley"),
     ("sauces", r"sauce|gravy|dressing|condiment|spice|herb|seasoning|salt|ketchup|mustard|mayonnaise|vinegar|salsa|stock|broth"),
 ]
 CATEGORY_KEYS = [k for k, _ in CATEGORIES] + ["other"]
